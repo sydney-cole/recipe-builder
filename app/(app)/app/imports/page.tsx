@@ -1,0 +1,3 @@
+import { PageHeader } from "@/components/app-shell/page-header";
+import { EmailIntake } from "@/components/imports/email-intake";
+export default function ImportsPage() { return <div className="page-container"><PageHeader eyebrow="Email import" title="Send recipes straight to PerfectPlate" description="The UI is ready for AgentMail intake and Firecrawl extraction when the backend is connected." /><EmailIntake /></div>; }
