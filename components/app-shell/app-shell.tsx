@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Bell, BookOpen, Compass, Home, Inbox, ListChecks, Search, Settings, Sparkles, UserRound } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { Bell, BookOpen, Compass, Home, Inbox, ListChecks, LogOut, Search, Settings, Sparkles } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,6 +30,17 @@ function NavItem({ item, mobile = false }: { item: (typeof primary)[number]; mob
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { signOut } = useAuthActions();
+  const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setIsSigningOut(true);
+    await signOut();
+    router.replace("/sign-in");
+    router.refresh();
+  }
+
   return (
     <div className="app-shell">
       <aside className="app-sidebar" aria-label="Main navigation">
@@ -50,7 +63,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <Button asChild variant="accent" className="hidden sm:inline-flex"><Link href="/app/imports"><Inbox size={17} />Email recipe</Link></Button>
           <Button variant="ghost" size="icon" aria-label="Notifications"><Bell size={19} /></Button>
-          <Button variant="secondary" size="icon" aria-label="Open profile"><UserRound size={18} /></Button>
+          <Button variant="secondary" size="icon" aria-label="Sign out" title="Sign out" disabled={isSigningOut} onClick={handleSignOut}>
+            <LogOut size={18} />
+          </Button>
         </header>
         <main id="main-content" className="app-main">{children}</main>
       </div>

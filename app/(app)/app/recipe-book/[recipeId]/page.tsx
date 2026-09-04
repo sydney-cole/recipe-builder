@@ -1,14 +1,92 @@
-import Link from "next/link";
+import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
+import { fetchQuery } from "convex/nextjs";
 import { ArrowLeft, Clock3, ExternalLink, Minus, Plus, ShoppingBasket, Users } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FoodArt } from "@/components/recipes/food-art";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { recipes, suggestions } from "@/lib/data/mock-data";
+import { api } from "@/convex/_generated/api";
+import { recipeArt } from "@/lib/data/recipe-view";
 
-const ingredients = ["12 oz orzo", "5 oz baby spinach", "2 lemons, zested and juiced", "3 cloves garlic", "4 oz parmesan, finely grated", "¼ cup chopped parsley", "2 tbsp olive oil"];
-const steps = ["Warm the olive oil in a wide skillet over medium heat. Add garlic and cook until fragrant.", "Stir in the orzo and toast for two minutes. Add water, season, and simmer until nearly tender.", "Fold in spinach, lemon zest, and half the parmesan. Cook until the greens wilt.", "Finish with lemon juice, herbs, and remaining parmesan. Taste and adjust seasoning."];
+export default async function RecipeDetailPage({
+  params,
+}: {
+  params: Promise<{ recipeId: string }>;
+}) {
+  const { recipeId } = await params;
+  const token = await convexAuthNextjsToken();
+  const data = await fetchQuery(api.recipes.get, { recipeId }, { token });
 
-export default async function RecipeDetailPage({ params }: { params: Promise<{ recipeId: string }> }) { const { recipeId } = await params; const recipe = [...recipes, ...suggestions].find((item) => item.id === recipeId); if (!recipe) notFound(); return <div className="page-container"><Button asChild variant="ghost" className="mb-5"><Link href="/app/recipe-book"><ArrowLeft size={17} />Back to Recipe Book</Link></Button><div className="recipe-detail-hero"><FoodArt variant={recipe.art} label={recipe.tags[0]} /><div className="p-6 sm:p-8"><div className="cluster">{recipe.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><h1 className="mt-4 font-display text-4xl font-semibold leading-tight sm:text-5xl">{recipe.title}</h1><p className="mt-4 max-w-2xl leading-7 text-muted-foreground">{recipe.description}</p><div className="mt-6 cluster text-sm font-bold text-muted-foreground"><span><Clock3 className="inline" size={17} /> {recipe.totalMinutes} min</span><span><Users className="inline" size={17} /> {recipe.servings} servings</span></div><div className="mt-7 cluster"><Button><ShoppingBasket size={17} />Add needed ingredients</Button><Button variant="secondary"><ExternalLink size={17} />View original</Button></div></div></div>
-  <div className="mt-8 grid gap-8 lg:grid-cols-[.85fr_1.15fr]"><section><div className="section-row"><div><h2 className="section-heading">Ingredients</h2><p className="section-copy">For {recipe.servings} servings</p></div><div className="cluster"><Button size="icon" variant="secondary" aria-label="Decrease servings"><Minus size={16} /></Button><Button size="icon" variant="secondary" aria-label="Increase servings"><Plus size={16} /></Button></div></div><Card><CardContent><ul className="divide-y divide-border">{ingredients.map((ingredient) => <li className="py-3 text-sm" key={ingredient}>{ingredient}</li>)}</ul></CardContent></Card></section><section><h2 className="section-heading">Instructions</h2><p className="section-copy mb-4">A clean, distraction-free cooking view.</p><ol className="stack">{steps.map((step, index) => <li className="flex gap-4 rounded-xl border border-border bg-white p-5" key={step}><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-white">{index + 1}</span><p className="pt-1 text-sm leading-6">{step}</p></li>)}</ol></section></div></div>; }
+  if (data === null) notFound();
+
+  const { recipe, ingredients } = data;
+  const totalMinutes =
+    recipe.totalTimeMinutes ??
+    (recipe.prepTimeMinutes ?? 0) + (recipe.cookTimeMinutes ?? 0);
+  const servings = recipe.servings ?? 0;
+  const tags = recipe.categories.length > 0 ? recipe.categories : recipe.cuisines;
+
+  return (
+    <div className="page-container">
+      <Button asChild variant="ghost" className="mb-5">
+        <Link href="/app/recipe-book"><ArrowLeft size={17} />Back to Recipe Book</Link>
+      </Button>
+      <div className="recipe-detail-hero">
+        <FoodArt variant={recipeArt(recipe.title)} label={tags[0] ?? "Recipe"} />
+        <div className="p-6 sm:p-8">
+          <div className="cluster">{tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
+          <h1 className="mt-4 font-display text-4xl font-semibold leading-tight sm:text-5xl">{recipe.title}</h1>
+          {recipe.description && <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">{recipe.description}</p>}
+          <div className="mt-6 cluster text-sm font-bold text-muted-foreground">
+            <span><Clock3 className="inline" size={17} /> {totalMinutes} min</span>
+            <span><Users className="inline" size={17} /> {servings} servings</span>
+          </div>
+          <div className="mt-7 cluster">
+            <Button><ShoppingBasket size={17} />Add needed ingredients</Button>
+            <Button asChild variant="secondary">
+              <a href={recipe.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={17} />View original</a>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 grid gap-8 lg:grid-cols-[.85fr_1.15fr]">
+        <section>
+          <div className="section-row">
+            <div>
+              <h2 className="section-heading">Ingredients</h2>
+              <p className="section-copy">For {servings} servings</p>
+            </div>
+            <div className="cluster">
+              <Button size="icon" variant="secondary" aria-label="Decrease servings"><Minus size={16} /></Button>
+              <Button size="icon" variant="secondary" aria-label="Increase servings"><Plus size={16} /></Button>
+            </div>
+          </div>
+          <Card>
+            <CardContent>
+              <ul className="divide-y divide-border">
+                {ingredients.map((ingredient) => (
+                  <li className="py-3 text-sm" key={ingredient._id}>{ingredient.originalText}</li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </section>
+        <section>
+          <h2 className="section-heading">Instructions</h2>
+          <p className="section-copy mb-4">A clean, distraction-free cooking view.</p>
+          <ol className="stack">
+            {recipe.instructions.map((instruction) => (
+              <li className="flex gap-4 rounded-xl border border-border bg-white p-5" key={instruction.position}>
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-white">{instruction.position}</span>
+                <p className="pt-1 text-sm leading-6">{instruction.text}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    </div>
+  );
+}

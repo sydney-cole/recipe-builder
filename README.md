@@ -1,10 +1,9 @@
 # PerfectPlate
 
 PerfectPlate is an email-powered recipe organizer and meal-planning application.
-The current implementation provides a complete frontend scaffold built with
-Next.js, TypeScript, Tailwind CSS, and shadcn-style UI components. Application
-data is currently mocked so frontend development does not depend on a running
-backend.
+The current implementation provides a frontend built with Next.js, TypeScript,
+Tailwind CSS, and shadcn-style UI components. Account access and the Recipe Book
+are connected to Convex; the remaining feature areas still use local mock data.
 
 ## Run the code locally
 
@@ -29,9 +28,8 @@ Open [http://localhost:3000](http://localhost:3000) in a browser. The developmen
 server supports hot reload, so saved frontend changes should appear without
 restarting it.
 
-The current frontend uses local mock data and does **not** require Convex to be
-running. If you are also working on the existing Convex integration, open a
-second terminal in the project root and run:
+The authenticated application and Recipe Book require Convex. Open a second
+terminal in the project root and run:
 
 ```sh
 npx convex dev
@@ -57,17 +55,17 @@ npm run build
 
 The frontend currently includes the following responsive, navigable flows:
 
-- **Marketing and authentication:** landing page, sign-in, and sign-up screens.
-  Authentication forms demonstrate the intended interaction but are not yet
-  connected to a user account backend.
+- **Marketing and authentication:** landing page plus working password-based
+  sign-in and sign-up screens backed by Convex Auth. Application routes require
+  an authenticated session.
 - **Application shell:** responsive desktop sidebar, top navigation, and a
   five-item mobile bottom navigation.
 - **Dashboard:** quick access to recipe discovery, email imports, grocery lists,
   recently saved recipes, and items needing attention.
 - **Recipe discovery:** search scaffolding for ingredients, moods, and recipe
   types, including removable search terms and explained mock recommendations.
-- **Recipe Book:** searchable and sortable saved-recipe gallery with links to
-  detailed recipe pages.
+- **Recipe Book:** Convex-backed, searchable and sortable recipe gallery with
+  links to detailed recipe pages and their ingredients and instructions.
 - **Recipe details:** ingredients, cooking instructions, serving controls,
   source attribution, and an action for adding needed ingredients to a grocery
   list.
@@ -85,10 +83,9 @@ The frontend currently includes the following responsive, navigable flows:
   loading skeletons, status badges, alerts, dialogs, empty-state scaffolding,
   and a custom not-found page.
 
-All recipe, import, subscription, and grocery data currently comes from
-`lib/data/mock-data.ts`. This keeps the frontend usable while providing a clear
-boundary for replacing mock operations with Convex queries, mutations, and
-actions later.
+Dashboard previews, imports, subscriptions, discovery suggestions, and grocery
+data currently come from `lib/data/mock-data.ts`. These can be replaced with
+Convex queries, mutations, and actions incrementally.
 
 ## Convex project setup
 

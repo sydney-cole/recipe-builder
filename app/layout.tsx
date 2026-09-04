@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
+import { ConvexClientProvider } from "./convex-client-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,7 +13,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         <a className="skip-link" href="#main-content">Skip to content</a>
-        {children}
+        <ConvexAuthNextjsServerProvider>
+          <ConvexClientProvider>{children}</ConvexClientProvider>
+        </ConvexAuthNextjsServerProvider>
       </body>
     </html>
   );
