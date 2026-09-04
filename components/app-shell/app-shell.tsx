@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { Bell, BookOpen, Compass, Home, Inbox, ListChecks, LogOut, Search, Settings, Sparkles } from "lucide-react";
+import { BookOpen, Compass, Home, Inbox, ListChecks, LogOut, Search, Settings, Sparkles } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -33,12 +33,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { signOut } = useAuthActions();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState(false);
 
   async function handleSignOut() {
+    setSignOutError(false);
     setIsSigningOut(true);
-    await signOut();
-    router.replace("/sign-in");
-    router.refresh();
+    try {
+      await signOut();
+      router.replace("/sign-in");
+      router.refresh();
+    } catch {
+      setSignOutError(true);
+    } finally {
+      setIsSigningOut(false);
+    }
   }
 
   return (
@@ -58,14 +66,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="app-frame">
         <header className="app-topbar">
           <span className="topbar-brand"><Brand compact /><span>PerfectPlate</span></span>
-          <button className="global-search" type="button" aria-label="Search recipes">
-            <Search size={17} /><span>Search recipes, ingredients, and lists</span><span className="keycap">⌘ K</span>
-          </button>
+          <Link className="global-search" href="/app/recipe-book" aria-label="Search recipes">
+            <Search size={17} /><span>Search your Recipe Book</span>
+          </Link>
           <Button asChild variant="accent" className="hidden sm:inline-flex"><Link href="/app/imports"><Inbox size={17} />Email recipe</Link></Button>
-          <Button variant="ghost" size="icon" aria-label="Notifications"><Bell size={19} /></Button>
           <Button variant="secondary" size="icon" aria-label="Sign out" title="Sign out" disabled={isSigningOut} onClick={handleSignOut}>
             <LogOut size={18} />
           </Button>
+          {signOutError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t sign out. Try again.</p>}
         </header>
         <main id="main-content" className="app-main">{children}</main>
       </div>

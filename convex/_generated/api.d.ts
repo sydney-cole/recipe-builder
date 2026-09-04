@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as email from "../email.js";
 import type * as http from "../http.js";
 import type * as lib_agentmail from "../lib/agentmail.js";
+import type * as lib_urls from "../lib/urls.js";
 import type * as recipes from "../recipes.js";
 import type * as seed from "../seed.js";
 import type * as users from "../users.js";
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   email: typeof email;
   http: typeof http;
   "lib/agentmail": typeof lib_agentmail;
+  "lib/urls": typeof lib_urls;
   recipes: typeof recipes;
   seed: typeof seed;
   users: typeof users;

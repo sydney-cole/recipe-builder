@@ -8,50 +8,12 @@ import {
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-
-function normalizeUrl(value: string) {
-  const url = new URL(value);
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Only HTTP and HTTPS recipe links are supported");
-  }
-
-  url.hash = "";
-  for (const key of [...url.searchParams.keys()]) {
-    if (key.toLowerCase().startsWith("utm_") || ["fbclid", "gclid"].includes(key.toLowerCase())) {
-      url.searchParams.delete(key);
-    }
-  }
-  url.searchParams.sort();
-  return url.toString();
-}
-
-function stringField(value: unknown, key: string) {
-  if (typeof value !== "object" || value === null) return undefined;
-  const field = (value as Record<string, unknown>)[key];
-  return typeof field === "string" ? field : undefined;
-}
-
-function linksFromMessage(message: unknown) {
-  const content = [
-    stringField(message, "extracted_text"),
-    stringField(message, "text"),
-    stringField(message, "extracted_html"),
-    stringField(message, "html"),
-    stringField(message, "preview"),
-  ]
-    .filter((value): value is string => value !== undefined)
-    .join("\n");
-
-  const matches = content.match(/https?:\/\/[^\s<>"')\]]+/gi) ?? [];
-  const normalized = matches.flatMap((match) => {
-    try {
-      return [normalizeUrl(match.replace(/[.,;:!?]+$/, ""))];
-    } catch {
-      return [];
-    }
-  });
-  return [...new Set(normalized)].slice(0, 10);
-}
+import {
+  normalizeRecipeUrl,
+  optionalStringField,
+  recipeLinksFromMessage,
+} from "./lib/urls";
+import { agentmail } from "./lib/agentmail";
 
 export const currentInbox = query({
   args: {},
@@ -83,7 +45,7 @@ export const queueUrl = mutation({
   handler: async (ctx, { sourceUrl }) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Unauthenticated");
-    const normalizedUrl = normalizeUrl(sourceUrl);
+    const normalizedUrl = normalizeRecipeUrl(sourceUrl);
     const existing = await ctx.db
       .query("recipeImports")
       .withIndex("by_requester_and_normalized_url", (q) =>
@@ -159,10 +121,21 @@ export const provisionInbox = action({
       throw new Error("AGENTMAIL_INBOX_ID is not configured");
     }
 
+    const remoteInbox = (await agentmail.getInbox(ctx, configuredInboxId)) as {
+      inbox_id?: unknown;
+      email?: unknown;
+    };
+    if (
+      typeof remoteInbox.inbox_id !== "string" ||
+      typeof remoteInbox.email !== "string"
+    ) {
+      throw new Error("AgentMail returned invalid inbox metadata");
+    }
+
     const saved = await ctx.runMutation(internal.email.saveInbox, {
       userId,
-      inboxId: configuredInboxId,
-      email: configuredInboxId,
+      inboxId: remoteInbox.inbox_id,
+      email: remoteInbox.email,
     });
     if (saved === null) throw new Error("Could not save the new inbox");
     return { email: saved.email };
@@ -172,7 +145,7 @@ export const provisionInbox = action({
 export const onMessageReceived = internalMutation({
   args: { message: v.any(), thread: v.any(), eventId: v.string() },
   handler: async (ctx, { message, eventId }) => {
-    const inboxId = stringField(message, "inbox_id");
+    const inboxId = optionalStringField(message, "inbox_id");
     if (inboxId === undefined) return { queued: 0 };
 
     const userInbox = await ctx.db
@@ -187,12 +160,23 @@ export const onMessageReceived = internalMutation({
       .first();
     if (alreadyHandled !== null) return { queued: 0 };
 
-    const sourceMessageId = stringField(message, "message_id");
-    const sourceSubject = stringField(message, "subject");
-    const links = linksFromMessage(message);
+    const sourceMessageId = optionalStringField(message, "message_id");
+    const sourceSubject = optionalStringField(message, "subject");
+    const links = recipeLinksFromMessage(message);
     const now = Date.now();
+    let queued = 0;
 
     for (const normalizedUrl of links) {
+      const existing = await ctx.db
+        .query("recipeImports")
+        .withIndex("by_requester_and_normalized_url", (q) =>
+          q
+            .eq("requestedBy", userInbox.userId)
+            .eq("normalizedUrl", normalizedUrl),
+        )
+        .first();
+      if (existing !== null) continue;
+
       await ctx.db.insert("recipeImports", {
         requestedBy: userInbox.userId,
         sourceUrl: normalizedUrl,
@@ -205,8 +189,9 @@ export const onMessageReceived = internalMutation({
         createdAt: now,
         updatedAt: now,
       });
+      queued += 1;
     }
 
-    return { queued: links.length };
+    return { queued };
   },
 });

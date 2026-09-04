@@ -9,6 +9,7 @@ import { Brand } from "@/components/brand";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { safeAppRedirect } from "@/lib/navigation";
 
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const { signIn } = useAuthActions();
@@ -32,8 +33,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
         throw new Error("Sign-in could not be completed. Please try again.");
       }
 
-      const next = searchParams.get("next");
-      router.replace(next?.startsWith("/app") ? next : "/app");
+      router.replace(safeAppRedirect(searchParams.get("next")));
       router.refresh();
     } catch (caughtError) {
       const message =
@@ -43,7 +43,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           ? "The email or password is incorrect."
           : message.includes("already exists")
             ? "An account with this email already exists."
-            : message,
+            : "We couldn’t complete that request. Please try again.",
       );
       setIsSubmitting(false);
     }

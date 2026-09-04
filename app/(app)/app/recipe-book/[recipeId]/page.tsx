@@ -1,12 +1,12 @@
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { fetchQuery } from "convex/nextjs";
-import { ArrowLeft, Clock3, ExternalLink, Minus, Plus, ShoppingBasket, Users } from "lucide-react";
+import { ArrowLeft, Clock3, ExternalLink, ShoppingBasket, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FoodArt } from "@/components/recipes/food-art";
+import { RecipeIngredients } from "@/components/recipes/recipe-ingredients";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/convex/_generated/api";
 import { recipeArt } from "@/lib/data/recipe-view";
 
@@ -44,7 +44,7 @@ export default async function RecipeDetailPage({
             <span><Users className="inline" size={17} /> {servings} servings</span>
           </div>
           <div className="mt-7 cluster">
-            <Button><ShoppingBasket size={17} />Add needed ingredients</Button>
+            <Button asChild><Link href="/app/grocery-lists"><ShoppingBasket size={17} />Open grocery lists</Link></Button>
             <Button asChild variant="secondary">
               <a href={recipe.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={17} />View original</a>
             </Button>
@@ -53,27 +53,7 @@ export default async function RecipeDetailPage({
       </div>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[.85fr_1.15fr]">
-        <section>
-          <div className="section-row">
-            <div>
-              <h2 className="section-heading">Ingredients</h2>
-              <p className="section-copy">For {servings} servings</p>
-            </div>
-            <div className="cluster">
-              <Button size="icon" variant="secondary" aria-label="Decrease servings"><Minus size={16} /></Button>
-              <Button size="icon" variant="secondary" aria-label="Increase servings"><Plus size={16} /></Button>
-            </div>
-          </div>
-          <Card>
-            <CardContent>
-              <ul className="divide-y divide-border">
-                {ingredients.map((ingredient) => (
-                  <li className="py-3 text-sm" key={ingredient._id}>{ingredient.originalText}</li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </section>
+        <RecipeIngredients ingredients={ingredients} initialServings={servings} />
         <section>
           <h2 className="section-heading">Instructions</h2>
           <p className="section-copy mb-4">A clean, distraction-free cooking view.</p>

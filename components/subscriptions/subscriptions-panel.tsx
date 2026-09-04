@@ -17,7 +17,13 @@ export function SubscriptionsPanel() {
     event.preventDefault();
     if (!url.trim()) return;
     const domain = url.replace(/^https?:\/\//, "").split("/")[0];
-    const item: Subscription = { id: crypto.randomUUID(), name: domain.split(".")[0].replace(/(^|-)\w/g, (m) => m.toUpperCase()), domain, status: "pending", lastReceived: "Waiting for confirmation", recipeCount: 0 };
+    const name = domain
+      .split(".")[0]
+      .split("-")
+      .filter(Boolean)
+      .map((word) => word[0].toUpperCase() + word.slice(1))
+      .join(" ");
+    const item: Subscription = { id: crypto.randomUUID(), name, domain, status: "pending", lastReceived: "Waiting for confirmation", recipeCount: 0 };
     setItems((current) => [item, ...current]); setUrl("");
   }
 

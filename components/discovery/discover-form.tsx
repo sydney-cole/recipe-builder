@@ -50,7 +50,7 @@ export function DiscoverForm() {
           <div><h2 id="matches-title" className="section-heading">Best matches for you</h2><p className="section-copy">Mock recommendations explain why each recipe fits your request.</p></div>
           <span className="text-sm font-bold text-primary">{visible.length} ideas</span>
         </div>
-        <div className="grid-auto">{visible.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} suggested />)}</div>
+        <div className="grid-auto">{visible.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} suggested detailsHref={null} />)}</div>
       </section>
     </div>
   );

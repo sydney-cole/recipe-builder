@@ -136,6 +136,9 @@ export const seed = internalMutation({
         .unique();
 
       if (existingRecipe !== null) {
+        if (existingRecipe.isPublic !== true) {
+          await ctx.db.patch(existingRecipe._id, { isPublic: true });
+        }
         const existingIngredients = await ctx.db
           .query("recipeIngredients")
           .withIndex("by_recipe", (q) => q.eq("recipeId", existingRecipe._id))
@@ -173,6 +176,7 @@ export const seed = internalMutation({
         importId,
         sourceUrl,
         normalizedSourceUrl: sourceUrl,
+        isPublic: true,
         sourceSite: "PerfectPlate Demo Kitchen",
         sourceAuthor: "PerfectPlate",
         title: sample.title,

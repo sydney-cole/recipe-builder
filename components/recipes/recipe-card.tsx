@@ -9,14 +9,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FoodArt } from "./food-art";
 import type { Recipe } from "@/lib/data/types";
 
-export function RecipeCard({ recipe, suggested = false }: { recipe: Recipe; suggested?: boolean }) {
+export function RecipeCard({
+  recipe,
+  suggested = false,
+  detailsHref = `/app/recipe-book/${recipe.id}`,
+}: {
+  recipe: Recipe;
+  suggested?: boolean;
+  detailsHref?: string | null;
+}) {
   const [saved, setSaved] = useState(!suggested);
   return (
     <Card className="recipe-card">
-      <Link href={`/app/recipe-book/${recipe.id}`} aria-label={`View ${recipe.title}`}><FoodArt variant={recipe.art} label={recipe.tags[0]} /></Link>
+      {detailsHref ? (
+        <Link href={detailsHref} aria-label={`View ${recipe.title}`}><FoodArt variant={recipe.art} label={recipe.tags[0]} /></Link>
+      ) : (
+        <FoodArt variant={recipe.art} label={recipe.tags[0]} />
+      )}
       <CardContent className="stack">
         <div>
-          <Link href={`/app/recipe-book/${recipe.id}`}><h3>{recipe.title}</h3></Link>
+          {detailsHref ? <Link href={detailsHref}><h3>{recipe.title}</h3></Link> : <h3>{recipe.title}</h3>}
           <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{recipe.description}</p>
         </div>
         <div className="recipe-meta"><span><Clock3 size={14} className="inline" /> {recipe.totalMinutes} min</span><span><Users size={14} className="inline" /> {recipe.servings}</span></div>
@@ -27,7 +39,7 @@ export function RecipeCard({ recipe, suggested = false }: { recipe: Recipe; sugg
           <Button variant={saved ? "secondary" : "default"} size="sm" onClick={() => setSaved(true)} disabled={saved}>
             {saved ? <BookCheck size={16} /> : <BookPlus size={16} />}{saved ? "In Recipe Book" : "Add to Recipe Book"}
           </Button>
-          <Button variant="secondary" size="sm"><ShoppingBasket size={16} />Add to list</Button>
+          <Button asChild variant="secondary" size="sm"><Link href="/app/grocery-lists"><ShoppingBasket size={16} />Add to list</Link></Button>
         </div>
         <p className="text-xs text-muted-foreground">Source: {recipe.source}</p>
       </CardContent>

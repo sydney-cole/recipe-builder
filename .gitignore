@@ -3,4 +3,5 @@
 node_modules/
 .next/
 .firecrawl/
+coverage/
 *.tsbuildinfo

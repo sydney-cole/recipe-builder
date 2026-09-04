@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { BookOpen, Search, SlidersHorizontal } from "lucide-react";
+import { BookOpen, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/app-shell/page-header";
@@ -13,11 +13,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import { recipeArt } from "@/lib/data/recipe-view";
 import type { Recipe } from "@/lib/data/types";
+import { filterAndSortRecipes, type RecipeSort } from "@/lib/recipes";
 
 export default function RecipeBookPage() {
   const convexRecipes = useQuery(api.recipes.list);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("recent");
+  const [sort, setSort] = useState<RecipeSort>("recent");
 
   const recipes = useMemo(() => {
     if (convexRecipes === undefined) return undefined;
@@ -34,21 +35,7 @@ export default function RecipeBookPage() {
       tags: recipe.categories.slice(0, 3),
       art: recipeArt(recipe.title),
     }));
-    const term = search.trim().toLowerCase();
-    const filtered = term
-      ? mapped.filter((recipe) =>
-          [recipe.title, recipe.description, recipe.source, ...recipe.tags]
-            .join(" ")
-            .toLowerCase()
-            .includes(term),
-        )
-      : mapped;
-
-    return [...filtered].sort((a, b) => {
-      if (sort === "quickest") return a.totalMinutes - b.totalMinutes;
-      if (sort === "az") return a.title.localeCompare(b.title);
-      return 0;
-    });
+    return filterAndSortRecipes(mapped, search, sort);
   }, [convexRecipes, search, sort]);
 
   return (
@@ -65,7 +52,6 @@ export default function RecipeBookPage() {
           <Search className="absolute left-3 top-3.5 text-muted-foreground" size={17} />
           <Input className="pl-10" placeholder="Search your Recipe Book" value={search} onChange={(event) => setSearch(event.target.value)} />
         </label>
-        <Button variant="secondary"><SlidersHorizontal size={17} />Filter</Button>
       </div>
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm font-bold">
@@ -73,7 +59,7 @@ export default function RecipeBookPage() {
         </p>
         <label className="text-sm text-muted-foreground">
           Sort:{" "}
-          <select className="rounded-md border border-border bg-white p-2 font-bold text-foreground" value={sort} onChange={(event) => setSort(event.target.value)}>
+          <select className="rounded-md border border-border bg-white p-2 font-bold text-foreground" value={sort} onChange={(event) => setSort(event.target.value as RecipeSort)}>
             <option value="recent">Recently added</option>
             <option value="quickest">Quickest</option>
             <option value="az">A–Z</option>

@@ -51,6 +51,25 @@ npm run lint
 npm run build
 ```
 
+### Tests
+
+The test suite uses Vitest, Testing Library, and `convex-test`. It covers pure
+domain logic, interactive React behavior, and authenticated Convex data access.
+
+```sh
+npm test                 # one complete run
+npm run test:watch       # rerun affected tests while developing
+npm run test:coverage    # text and HTML coverage reports
+npm run check            # typecheck, lint, and tests
+```
+
+Keep tests beside the module they exercise using `*.test.ts` or `*.test.tsx`.
+Every bug fix should include a regression test, and new Convex functions should
+cover both authorized and unauthorized callers. Generated coverage output is
+written to `coverage/` and should not be committed. The GitHub Actions CI
+workflow runs checks, coverage floors, and a production build on pushes and
+pull requests.
+
 ## Frontend features currently supported
 
 The frontend currently includes the following responsive, navigable flows:
@@ -66,9 +85,8 @@ The frontend currently includes the following responsive, navigable flows:
   types, including removable search terms and explained mock recommendations.
 - **Recipe Book:** Convex-backed, searchable and sortable recipe gallery with
   links to detailed recipe pages and their ingredients and instructions.
-- **Recipe details:** ingredients, cooking instructions, serving controls,
-  source attribution, and an action for adding needed ingredients to a grocery
-  list.
+- **Recipe details:** ingredients, cooking instructions, working serving
+  controls, source attribution, and a link into grocery-list planning.
 - **Recipe importing:** authenticated users can provision an AgentMail inbox,
   email or paste recipe links, and see Convex-backed import states. Inbound
   AgentMail webhooks are verified and deduplicated by the component. Firecrawl

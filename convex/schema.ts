@@ -79,6 +79,7 @@ export default defineSchema({
     importId: v.optional(v.id("recipeImports")),
     sourceUrl: v.string(),
     normalizedSourceUrl: v.string(),
+    isPublic: v.optional(v.boolean()),
     sourceSite: v.optional(v.string()),
     sourceAuthor: v.optional(v.string()),
     title: v.string(),
@@ -115,6 +116,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_normalized_source_url", ["normalizedSourceUrl"])
+    .index("by_public", ["isPublic"])
     .index("by_import", ["importId"])
     .searchIndex("search_recipes", {
       searchField: "title",
