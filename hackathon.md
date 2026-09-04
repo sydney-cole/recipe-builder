@@ -8,11 +8,11 @@
 - **Frontend:** not deployed
 - **Convex deployment:** not deployed
 - **Components:** none
-- **Convex features:** schema, tables, indexes, full-text search, queries, HTTP actions
+- **Convex features:** schema, tables, indexes, full-text search, queries, realtime queries, mutations, actions, HTTP actions, registered components
 - **Auth:** Convex Auth
 - **AI models:** none
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-03T21:41:59Z
+- **Last updated:** 2026-09-04T18:46:38Z
 
 ## Log
 
@@ -37,9 +37,25 @@ signed-webhook configuration, then refreshed generated component types.
 Convex features: component configuration and HTTP actions
 (`convex/convex.config.ts`, `convex/http.ts`).
 
-### 2026-09-03 - working tree
+### 2026-09-03 - 71aaeaa
 Built the responsive PerfectPlate frontend scaffold with landing and auth
 screens, recipe discovery, Recipe Book, recipe import states, food-blog
 subscriptions, editable grocery lists, settings, and reusable UI states. The
 flows use isolated mock data until Convex and AgentMail are connected
 (`app/`, `components/`, `lib/data/mock-data.ts`, `DESIGN.md`, `README.md`).
+
+### 2026-09-04 - 492a345
+Connected the Next.js frontend to Convex Auth with password account flows,
+sign-out, cookie-backed route protection, and authenticated recipe queries.
+Replaced the Recipe Book mock data with realtime seeded recipes and
+server-rendered details (`proxy.ts`, `app/convex-client-provider.tsx`,
+`components/auth/auth-form.tsx`, `convex/recipes.ts`).
+
+### 2026-09-04 - working tree
+Registered the official AgentMail Convex component and added an authenticated
+connection to the existing project inbox, signed webhook ingestion, and
+user-owned recipe-import queuing for links received by email. Replaced the demo
+inbox and import list with realtime Convex data. Live email receipt still
+requires the provider API key and webhook secret to be configured outside Git
+(`convex/convex.config.ts`,
+`convex/email.ts`, `convex/http.ts`, `components/imports/email-intake.tsx`).

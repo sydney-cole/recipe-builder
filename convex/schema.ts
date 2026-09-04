@@ -36,6 +36,18 @@ export default defineSchema({
     .index("email", ["email"])
     .index("phone", ["phone"]),
 
+  // Maps each account to its AgentMail inbox. The AgentMail component keeps
+  // message and thread contents in its isolated component tables.
+  userInboxes: defineTable({
+    userId: v.id("users"),
+    inboxId: v.string(),
+    email: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_inbox", ["inboxId"]),
+
   // One attempt to turn a URL into a recipe. Keeping jobs separate from the
   // finished recipe makes retries and user-visible scrape errors easy to track.
   recipeImports: defineTable({
@@ -46,6 +58,9 @@ export default defineSchema({
     attemptCount: v.number(),
     recipeId: v.optional(v.id("recipes")),
     errorMessage: v.optional(v.string()),
+    sourceMessageId: v.optional(v.string()),
+    sourceEventId: v.optional(v.string()),
+    sourceSubject: v.optional(v.string()),
     startedAt: v.optional(v.number()),
     finishedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -54,6 +69,8 @@ export default defineSchema({
     .index("by_normalized_url", ["normalizedUrl"])
     .index("by_status", ["status"])
     .index("by_requester", ["requestedBy"])
+    .index("by_requester_and_normalized_url", ["requestedBy", "normalizedUrl"])
+    .index("by_source_event", ["sourceEventId"])
     .index("by_requester_and_status", ["requestedBy", "status"]),
 
   // Canonical recipe content parsed from the source page. User-specific state

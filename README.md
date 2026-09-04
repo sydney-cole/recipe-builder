@@ -69,9 +69,10 @@ The frontend currently includes the following responsive, navigable flows:
 - **Recipe details:** ingredients, cooking instructions, serving controls,
   source attribution, and an action for adding needed ingredients to a grocery
   list.
-- **Recipe importing:** an assigned-inbox preview for emailed recipe links, a
-  direct URL import form, and received, scraping, ready, and attention states.
-  AgentMail and Firecrawl are not yet wired to these frontend controls.
+- **Recipe importing:** authenticated users can provision an AgentMail inbox,
+  email or paste recipe links, and see Convex-backed import states. Inbound
+  AgentMail webhooks are verified and deduplicated by the component. Firecrawl
+  extraction from the queued links is the next integration step.
 - **Food-blog subscriptions:** add and manage mock food-blog/newsletter
   subscriptions with active, pending, and paused states.
 - **Grocery lists:** list overview plus an interactive editor that can add,
@@ -118,3 +119,32 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET
 
 Never put either secret in Git or in client-side environment variables. Each
 developer or deployment must configure its own Convex environment variables.
+
+## AgentMail
+
+The official AgentMail Convex component stores inbox messages and threads,
+verifies inbound webhook signatures, and routes recipe links into the
+`recipeImports` table.
+
+Create an API key in the AgentMail console, then enter it and the existing inbox
+identifier directly into the Convex development deployment:
+
+```sh
+npx convex env set AGENTMAIL_API_KEY
+npx convex env set AGENTMAIL_INBOX_ID
+```
+
+Start the application, create an account, and use **Connect recipe inbox** on
+the imports page. Then register this endpoint in the AgentMail console:
+
+```text
+https://<your-convex-site>/agentmail/webhook
+```
+
+Copy the webhook signing secret into Convex:
+
+```sh
+npx convex env set AGENTMAIL_WEBHOOK_SECRET
+```
+
+Do not store the API key or webhook signing secret in `.env.local` or Git.

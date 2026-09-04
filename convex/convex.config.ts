@@ -1,4 +1,5 @@
 import firecrawl from "@firecrawl/firecrawl-convex/convex.config";
+import agentmail from "@agentmail/convex/convex.config";
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
 
@@ -16,5 +17,7 @@ app.use(firecrawl, {
     FIRECRAWL_WEBHOOK_SECRET: app.env.FIRECRAWL_WEBHOOK_SECRET,
   },
 });
+
+app.use(agentmail);
 
 export default app;
