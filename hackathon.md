@@ -4,7 +4,7 @@
 - **Event:** Convex All Gas Hackathon
 - **What it does:** Helps home cooks discover and import recipes, turn ingredients into a grocery list, and save personal recipe cards with notes.
 - **Live app:** not deployed
-- **Repo:** https://github.com/sydney-cole/recipe-builder
+- **Repo:** private
 - **Frontend:** not deployed
 - **Convex deployment:** not deployed
 - **Components:** none
@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** none
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-04T18:46:38Z
+- **Last updated:** 2026-09-04T19:49:02Z
 
 ## Log
 
@@ -51,7 +51,7 @@ Replaced the Recipe Book mock data with realtime seeded recipes and
 server-rendered details (`proxy.ts`, `app/convex-client-provider.tsx`,
 `components/auth/auth-form.tsx`, `convex/recipes.ts`).
 
-### 2026-09-04 - working tree
+### 2026-09-04 - cd8095e
 Registered the official AgentMail Convex component and added an authenticated
 connection to the existing project inbox, signed webhook ingestion, and
 user-owned recipe-import queuing for links received by email. Replaced the demo
@@ -59,3 +59,10 @@ inbox and import list with realtime Convex data. Live email receipt still
 requires the provider API key and webhook secret to be configured outside Git
 (`convex/convex.config.ts`,
 `convex/email.ts`, `convex/http.ts`, `components/imports/email-intake.tsx`).
+
+### 2026-09-04 - a12b3b1
+Hardened recipe ownership checks, inbox metadata validation, URL normalization,
+and duplicate import handling. Added working recipe serving controls, corrected
+unfinished UI claims, and introduced CI plus 40 tests across Convex access,
+domain logic, and interactive components (`convex/recipes.ts`,
+`convex/email.ts`, `convex/lib/urls.ts`, `.github/workflows/ci.yml`).
