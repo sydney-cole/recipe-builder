@@ -1,0 +1,33 @@
+schema: spec-driven
+
+context: |
+  PerfectPlate is an email-powered recipe organizer and meal-planning app.
+  The frontend uses Next.js 16 App Router, React 19, TypeScript, Tailwind CSS,
+  and shadcn-style components. Convex provides the backend and authentication;
+  AgentMail handles recipe email intake and Firecrawl handles link extraction.
+  Some feature areas still use data from lib/data/mock-data.ts, so proposals
+  should distinguish mock-backed behavior from Convex-backed behavior.
+  Use npm. Keep tests beside source as *.test.ts or *.test.tsx with Vitest,
+  Testing Library, and convex-test. The standard verification command is
+  `npm run check`; production-facing changes should also pass `npm run build`.
+
+rules:
+  proposal:
+    - State user value, scope, and explicit non-goals.
+    - Identify whether affected data is mock-backed or Convex-backed.
+  specs:
+    - Express requirements as observable behavior with concrete scenarios.
+    - Cover authentication, empty, loading, and error states when relevant.
+  design:
+    - Call out Convex schema, authorization, migration, and webhook impacts when relevant.
+  tasks:
+    - Pair behavior changes with focused tests and finish with verification tasks.
+
+operations:
+  apply:
+    guidance:
+      - Preserve unrelated working-tree changes.
+      - Run focused tests while iterating, then run the standard verification command.
+  archive:
+    guidance:
+      - Archive only after implementation and verification agree with the specs.
