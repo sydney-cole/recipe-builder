@@ -6,6 +6,10 @@ import schema from "./schema";
 
 const modules = import.meta.glob("./**/!(*.test).ts");
 
+function initTest() {
+  return convexTest(schema, modules);
+}
+
 async function createUser(t: ReturnType<typeof convexTest>, name: string) {
   return await t.run(async (ctx) =>
     ctx.db.insert("users", {
@@ -52,18 +56,29 @@ async function createRecipe(
 
 describe("email functions", () => {
   it("requires authentication and deduplicates normalized URL submissions", async () => {
-    const t = convexTest(schema, modules);
+    const t = initTest();
     await expect(
       t.mutation(api.email.queueUrl, { sourceUrl: "https://example.com/recipe" }),
     ).rejects.toThrow(/Unauthenticated/);
 
     const userId = await createUser(t, "Ada");
     const asAda = t.withIdentity({ subject: userId });
-    const first = await asAda.mutation(api.email.queueUrl, {
-      sourceUrl: "https://EXAMPLE.com/recipe?utm_source=email&b=2&a=1#steps",
+    const first = await t.run(async (ctx) => {
+      const now = Date.now();
+      return await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://example.com/recipe?a=1&b=2",
+        normalizedUrl: "https://example.com/recipe?a=1&b=2",
+        sourceKind: "direct",
+        workflowId: "existing-workflow",
+        status: "queued",
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
     });
     const second = await asAda.mutation(api.email.queueUrl, {
-      sourceUrl: "https://example.com/recipe?a=1&b=2",
+      sourceUrl: "https://EXAMPLE.com/recipe?utm_source=email&b=2&a=1#steps",
     });
 
     expect(second).toBe(first);
@@ -72,8 +87,8 @@ describe("email functions", () => {
     expect(imports[0].normalizedUrl).toBe("https://example.com/recipe?a=1&b=2");
   });
 
-  it("routes only new, valid links from the connected AgentMail inbox", async () => {
-    const t = convexTest(schema, modules);
+  it("ignores duplicate links and unknown AgentMail inboxes", async () => {
+    const t = initTest();
     const userId = await createUser(t, "Lin");
     await t.run(async (ctx) => {
       const now = Date.now();
@@ -81,6 +96,17 @@ describe("email functions", () => {
         userId,
         inboxId: "inbox-1",
         email: "recipes@example.com",
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://example.com/dinner",
+        normalizedUrl: "https://example.com/dinner",
+        sourceKind: "email",
+        workflowId: "existing-workflow",
+        status: "queued",
+        attemptCount: 0,
         createdAt: now,
         updatedAt: now,
       });
@@ -96,7 +122,7 @@ describe("email functions", () => {
         text: "https://example.com/dinner?utm_source=email https://example.com/dinner",
       },
     });
-    expect(first).toEqual({ queued: 1 });
+    expect(first).toEqual({ queued: 0 });
 
     const repeatedUrl = await t.mutation(internal.email.onMessageReceived, {
       eventId: "event-2",
@@ -116,7 +142,7 @@ describe("email functions", () => {
 
 describe("recipe authorization", () => {
   it("only returns public, imported, or explicitly saved recipes", async () => {
-    const t = convexTest(schema, modules);
+    const t = initTest();
     const adaId = await createUser(t, "Ada");
     const graceId = await createUser(t, "Grace");
     const publicId = await createRecipe(t, "public", { isPublic: true });
@@ -149,7 +175,113 @@ describe("recipe authorization", () => {
   });
 
   it("rejects anonymous access", async () => {
-    const t = convexTest(schema, modules);
+    const t = initTest();
     await expect(t.query(api.recipes.list)).rejects.toThrow(/Unauthenticated/);
+  });
+});
+
+describe("recipe scrape persistence", () => {
+  it("atomically stores one agent-ready artifact and completes idempotently", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "Mae");
+    const importId = await t.run(async (ctx) => {
+      const now = Date.now();
+      return await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://example.com/soup",
+        normalizedUrl: "https://example.com/soup",
+        sourceKind: "agent_discovery",
+        sourceQuery: "bright tomato soup",
+        status: "scraping",
+        attemptCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    const scrape = {
+      markdown: "# Tomato soup\n\nTomatoes, stock, and basil.",
+      recipeJsonLd: JSON.stringify({ "@type": "Recipe", name: "Tomato soup" }),
+      pageTitle: "Tomato soup",
+      canonicalUrl: "https://example.com/soup",
+      statusCode: 200,
+      truncated: false,
+    };
+
+    const first = await t.mutation(internal.recipeIngestion.persistScrape, {
+      importId,
+      scrape,
+    });
+    const second = await t.mutation(internal.recipeIngestion.persistScrape, {
+      importId,
+      scrape,
+    });
+    expect(second).toBe(first);
+    await expect(
+      t.query(internal.recipeIngestion.agentReadyArtifact, { importId }),
+    ).resolves.toMatchObject({
+      artifactId: first,
+      sourceUrl: "https://example.com/soup",
+      sourceKind: "agent_discovery",
+      sourceQuery: "bright tomato soup",
+      markdown: scrape.markdown,
+    });
+
+    await t.run(async (ctx) => {
+      const recipeImport = await ctx.db.get(importId);
+      const artifact = await ctx.db.get(first);
+      expect(recipeImport).toMatchObject({
+        status: "scraped",
+        scrapeArtifactId: first,
+      });
+      expect(artifact).toMatchObject({
+        importId,
+        markdown: scrape.markdown,
+        pageTitle: "Tomato soup",
+      });
+      const allArtifacts = await ctx.db
+        .query("recipeScrapeArtifacts")
+        .withIndex("by_import", (q) => q.eq("importId", importId))
+        .collect();
+      expect(allArtifacts).toHaveLength(1);
+    });
+  });
+
+  it("ignores a stale workflow failure and records the current bounded failure", async () => {
+    const t = initTest();
+    const importId = await t.run(async (ctx) => {
+      const now = Date.now();
+      return await ctx.db.insert("recipeImports", {
+        sourceUrl: "https://example.com/failure",
+        normalizedUrl: "https://example.com/failure",
+        sourceKind: "agent_discovery",
+        workflowId: "workflow-2",
+        status: "scraping",
+        attemptCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+
+    await t.mutation(internal.recipeIngestion.onIngestionComplete, {
+      workflowId: "workflow-1",
+      context: { importId },
+      result: { kind: "failed", error: "Stale workflow failed" },
+    });
+    await t.run(async (ctx) => {
+      const recipeImport = await ctx.db.get(importId);
+      expect(recipeImport?.status).toBe("scraping");
+      expect(recipeImport?.errorMessage).toBeUndefined();
+    });
+
+    await t.mutation(internal.recipeIngestion.onIngestionComplete, {
+      workflowId: "workflow-2",
+      context: { importId },
+      result: { kind: "failed", error: `Provider failed ${"x".repeat(600)}` },
+    });
+    await t.run(async (ctx) => {
+      const recipeImport = await ctx.db.get(importId);
+      expect(recipeImport?.status).toBe("failed");
+      expect(recipeImport?.errorMessage).toHaveLength(500);
+    });
   });
 });

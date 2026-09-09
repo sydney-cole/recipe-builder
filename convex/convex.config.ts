@@ -1,5 +1,6 @@
 import firecrawl from "@firecrawl/firecrawl-convex/convex.config";
 import agentmail from "@agentmail/convex/convex.config";
+import workflow from "@convex-dev/workflow/convex.config";
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
 
@@ -19,5 +20,6 @@ app.use(firecrawl, {
 });
 
 app.use(agentmail);
+app.use(workflow);
 
 export default app;

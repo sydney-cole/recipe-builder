@@ -5,6 +5,7 @@ import { authTables } from "@convex-dev/auth/server";
 const importStatus = v.union(
   v.literal("queued"),
   v.literal("scraping"),
+  v.literal("scraped"),
   v.literal("parsed"),
   v.literal("completed"),
   v.literal("failed"),
@@ -54,8 +55,18 @@ export default defineSchema({
     requestedBy: v.optional(v.id("users")),
     sourceUrl: v.string(),
     normalizedUrl: v.string(),
+    sourceKind: v.optional(
+      v.union(
+        v.literal("direct"),
+        v.literal("email"),
+        v.literal("agent_discovery"),
+      ),
+    ),
+    sourceQuery: v.optional(v.string()),
     status: importStatus,
     attemptCount: v.number(),
+    workflowId: v.optional(v.string()),
+    scrapeArtifactId: v.optional(v.id("recipeScrapeArtifacts")),
     recipeId: v.optional(v.id("recipes")),
     errorMessage: v.optional(v.string()),
     sourceMessageId: v.optional(v.string()),
@@ -72,6 +83,30 @@ export default defineSchema({
     .index("by_requester_and_normalized_url", ["requestedBy", "normalizedUrl"])
     .index("by_source_event", ["sourceEventId"])
     .index("by_requester_and_status", ["requestedBy", "status"]),
+
+  // Bounded source evidence produced by Firecrawl. This is intentionally kept
+  // separate from `recipes`: the future OpenAI agent consumes this artifact to
+  // create the final recipe card and grocery data.
+  recipeScrapeArtifacts: defineTable({
+    importId: v.id("recipeImports"),
+    sourceUrl: v.string(),
+    normalizedUrl: v.string(),
+    markdown: v.string(),
+    recipeJsonLd: v.optional(v.string()),
+    pageTitle: v.optional(v.string()),
+    pageDescription: v.optional(v.string()),
+    pageLanguage: v.optional(v.string()),
+    canonicalUrl: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    statusCode: v.optional(v.number()),
+    firecrawlWarning: v.optional(v.string()),
+    truncated: v.boolean(),
+    scrapedAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_import", ["importId"])
+    .index("by_normalized_url", ["normalizedUrl"]),
 
   // Canonical recipe content parsed from the source page. User-specific state
   // such as notes and favorites belongs in `savedRecipes` below.

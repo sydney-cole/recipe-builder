@@ -9,11 +9,11 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import {
-  normalizeRecipeUrl,
   optionalStringField,
   recipeLinksFromMessage,
 } from "./lib/urls";
 import { agentmail } from "./lib/agentmail";
+import { queueRecipeSource } from "./recipeIngestion";
 
 export const currentInbox = query({
   args: {},
@@ -41,29 +41,19 @@ export const recentImports = query({
 });
 
 export const queueUrl = mutation({
-  args: { sourceUrl: v.string() },
+  args: {
+    sourceUrl: v.string(),
+  },
+  returns: v.id("recipeImports"),
   handler: async (ctx, { sourceUrl }) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Unauthenticated");
-    const normalizedUrl = normalizeRecipeUrl(sourceUrl);
-    const existing = await ctx.db
-      .query("recipeImports")
-      .withIndex("by_requester_and_normalized_url", (q) =>
-        q.eq("requestedBy", userId).eq("normalizedUrl", normalizedUrl),
-      )
-      .first();
-    if (existing !== null) return existing._id;
-
-    const now = Date.now();
-    return await ctx.db.insert("recipeImports", {
-      requestedBy: userId,
+    const queued = await queueRecipeSource(ctx, {
+      userId,
       sourceUrl,
-      normalizedUrl,
-      status: "queued",
-      attemptCount: 0,
-      createdAt: now,
-      updatedAt: now,
+      sourceKind: "direct",
     });
+    return queued.importId;
   },
 });
 
@@ -144,6 +134,7 @@ export const provisionInbox = action({
 
 export const onMessageReceived = internalMutation({
   args: { message: v.any(), thread: v.any(), eventId: v.string() },
+  returns: v.object({ queued: v.number() }),
   handler: async (ctx, { message, eventId }) => {
     const inboxId = optionalStringField(message, "inbox_id");
     if (inboxId === undefined) return { queued: 0 };
@@ -163,33 +154,18 @@ export const onMessageReceived = internalMutation({
     const sourceMessageId = optionalStringField(message, "message_id");
     const sourceSubject = optionalStringField(message, "subject");
     const links = recipeLinksFromMessage(message);
-    const now = Date.now();
     let queued = 0;
 
     for (const normalizedUrl of links) {
-      const existing = await ctx.db
-        .query("recipeImports")
-        .withIndex("by_requester_and_normalized_url", (q) =>
-          q
-            .eq("requestedBy", userInbox.userId)
-            .eq("normalizedUrl", normalizedUrl),
-        )
-        .first();
-      if (existing !== null) continue;
-
-      await ctx.db.insert("recipeImports", {
-        requestedBy: userInbox.userId,
+      const result = await queueRecipeSource(ctx, {
+        userId: userInbox.userId,
         sourceUrl: normalizedUrl,
-        normalizedUrl,
-        status: "queued",
-        attemptCount: 0,
+        sourceKind: "email",
         sourceMessageId,
         sourceEventId: eventId,
         sourceSubject,
-        createdAt: now,
-        updatedAt: now,
       });
-      queued += 1;
+      if (result.queued) queued += 1;
     }
 
     return { queued };
