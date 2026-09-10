@@ -285,3 +285,224 @@ describe("recipe scrape persistence", () => {
     });
   });
 });
+
+describe("agent-generated recipe persistence", () => {
+  it("atomically creates an editable recipe card and necessary-ingredient list", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "Mina");
+    const importId = await t.run(async (ctx) => {
+      const now = Date.now();
+      const id = await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://kitchen.example/lemon-pasta",
+        normalizedUrl: "https://kitchen.example/lemon-pasta",
+        sourceKind: "direct",
+        status: "processing",
+        attemptCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("recipeScrapeArtifacts", {
+        importId: id,
+        sourceUrl: "https://kitchen.example/lemon-pasta",
+        normalizedUrl: "https://kitchen.example/lemon-pasta",
+        markdown: "# Lemon pasta",
+        truncated: false,
+        scrapedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return id;
+    });
+
+    const extraction = {
+      title: "Lemon Pasta",
+      description: "A bright pasta.",
+      sourceSite: "Kitchen Example",
+      sourceAuthor: "Test Kitchen",
+      yieldText: "4 servings",
+      servings: 4,
+      prepTimeMinutes: 10,
+      cookTimeMinutes: 20,
+      totalTimeMinutes: 30,
+      cuisines: ["Italian"],
+      categories: ["Dinner"],
+      keywords: ["pasta"],
+      instructions: [{ position: 1, text: "Cook the pasta.", section: null }],
+      ingredients: [
+        {
+          position: 1,
+          section: null,
+          originalText: "12 oz spaghetti",
+          name: "Spaghetti",
+          normalizedName: "spaghetti",
+          quantity: 12,
+          quantityText: "12",
+          unit: "oz",
+          preparation: null,
+          notes: null,
+          category: "Pantry",
+          isOptional: false,
+        },
+        {
+          position: 2,
+          section: null,
+          originalText: "Parmesan, optional",
+          name: "Parmesan",
+          normalizedName: "parmesan",
+          quantity: null,
+          quantityText: null,
+          unit: null,
+          preparation: null,
+          notes: "for serving",
+          category: "Dairy",
+          isOptional: true,
+        },
+      ],
+      warnings: [],
+    };
+
+    const first = await t.mutation(
+      internal.recipeAgentData.persistGeneratedRecipe,
+      { importId, model: "openai/test-model", extraction },
+    );
+    const second = await t.mutation(
+      internal.recipeAgentData.persistGeneratedRecipe,
+      { importId, model: "openai/test-model", extraction },
+    );
+    expect(second).toEqual(first);
+
+    await t.run(async (ctx) => {
+      const recipe = await ctx.db.get(first.recipeId);
+      const list = await ctx.db.get(first.groceryListId);
+      const recipeIngredients = await ctx.db
+        .query("recipeIngredients")
+        .withIndex("by_recipe", (q) => q.eq("recipeId", first.recipeId))
+        .collect();
+      const groceryItems = await ctx.db
+        .query("groceryListItems")
+        .withIndex("by_list", (q) => q.eq("listId", first.groceryListId))
+        .collect();
+      const saved = await ctx.db
+        .query("savedRecipes")
+        .withIndex("by_user_and_recipe", (q) =>
+          q.eq("userId", userId).eq("recipeId", first.recipeId),
+        )
+        .unique();
+      expect(recipe).toMatchObject({
+        title: "Lemon Pasta",
+        sourceUrl: "https://kitchen.example/lemon-pasta",
+      });
+      expect(list).toMatchObject({
+        name: "Lemon Pasta ingredients",
+        sourceRecipeId: first.recipeId,
+      });
+      expect(recipeIngredients).toHaveLength(2);
+      expect(groceryItems).toHaveLength(1);
+      expect(groceryItems[0]).toMatchObject({ name: "Spaghetti", quantity: 12 });
+      expect(saved?.userId).toBe(userId);
+    });
+  });
+});
+
+describe("editable recipe cards", () => {
+  it("lets only the owner edit fields, ingredients, notes, and removal state", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "Owner");
+    const otherId = await createUser(t, "Other");
+    const recipeId = await createRecipe(t, "editable", { requestedBy: ownerId });
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const asOther = t.withIdentity({ subject: otherId });
+
+    await expect(
+      asOther.mutation(api.recipeCards.updateCard, {
+        recipeId,
+        title: "Stolen",
+      }),
+    ).rejects.toThrow(/Forbidden/);
+
+    await asOwner.mutation(api.recipeCards.updateCard, {
+      recipeId,
+      title: "My edited recipe",
+      servings: 6,
+      instructions: [{ position: 99, text: "Mix everything." }],
+    });
+    await asOwner.mutation(api.recipeCards.setNotes, {
+      recipeId,
+      notes: "Use less salt next time.",
+    });
+    const recipeIngredientId = await asOwner.mutation(
+      api.recipeCards.addIngredient,
+      { recipeId, name: "Fresh basil", quantity: 2, unit: "tbsp" },
+    );
+    await asOwner.mutation(api.recipeCards.updateIngredient, {
+      recipeIngredientId,
+      quantity: 3,
+      notes: "chopped",
+    });
+
+    const detail = await asOwner.query(api.recipes.get, { recipeId });
+    expect(detail?.recipe).toMatchObject({
+      title: "My edited recipe",
+      servings: 6,
+      instructions: [{ position: 1, text: "Mix everything." }],
+    });
+    expect(detail?.ingredients[0]).toMatchObject({
+      name: "Fresh basil",
+      quantity: 3,
+      notes: "chopped",
+    });
+    expect(detail?.saved?.notes).toBe("Use less salt next time.");
+
+    await asOwner.mutation(api.recipeCards.removeIngredient, {
+      recipeIngredientId,
+    });
+    await asOwner.mutation(api.recipeCards.removeCard, { recipeId });
+    expect(await asOwner.query(api.recipes.get, { recipeId })).toBeNull();
+  });
+});
+
+describe("editable grocery lists", () => {
+  it("supports owned list and item creation, editing, and independent deletion", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "Shopper");
+    const otherId = await createUser(t, "Visitor");
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const asOther = t.withIdentity({ subject: otherId });
+
+    const listId = await asOwner.mutation(api.groceryLists.create, {
+      name: "Weekend",
+    });
+    const itemId = await asOwner.mutation(api.groceryLists.addItem, {
+      listId,
+      name: "Tomatoes",
+      quantity: 2,
+      unit: "lb",
+    });
+    await expect(
+      asOther.mutation(api.groceryLists.updateItem, {
+        itemId,
+        quantity: 10,
+      }),
+    ).rejects.toThrow(/Forbidden/);
+
+    await asOwner.mutation(api.groceryLists.updateItem, {
+      itemId,
+      name: "Cherry tomatoes",
+      quantity: 3,
+      isChecked: true,
+    });
+    await asOwner.mutation(api.groceryLists.updateList, {
+      listId,
+      name: "Saturday market",
+      status: "completed",
+    });
+    expect(await asOwner.query(api.groceryLists.get, { listId })).toMatchObject({
+      list: { name: "Saturday market", status: "completed" },
+      items: [{ name: "Cherry tomatoes", quantity: 3, isChecked: true }],
+    });
+
+    await asOwner.mutation(api.groceryLists.removeList, { listId });
+    expect(await asOwner.query(api.groceryLists.get, { listId })).toBeNull();
+  });
+});

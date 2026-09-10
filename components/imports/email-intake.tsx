@@ -13,17 +13,21 @@ import { api } from "@/convex/_generated/api";
 
 type DisplayStatus = "received" | "scraping" | "ready" | "attention";
 
-function displayStatus(status: "queued" | "scraping" | "scraped" | "parsed" | "completed" | "failed"): DisplayStatus {
+type ImportStatus = "queued" | "scraping" | "scraped" | "processing" | "parsed" | "needs_review" | "completed" | "failed";
+
+function displayStatus(status: ImportStatus): DisplayStatus {
   if (status === "queued") return "received";
-  if (status === "scraping") return "scraping";
-  if (status === "failed") return "attention";
+  if (status === "scraping" || status === "processing") return "scraping";
+  if (status === "failed" || status === "needs_review") return "attention";
   return "ready";
 }
 
-function importDetail(status: "queued" | "scraping" | "scraped" | "parsed" | "completed" | "failed") {
+function importDetail(status: ImportStatus) {
   if (status === "queued") return "Waiting for recipe extraction";
   if (status === "scraping") return "Extracting ingredients and instructions";
+  if (status === "processing") return "Building your recipe card and grocery list";
   if (status === "failed") return "Import needs attention";
+  if (status === "needs_review") return "Recipe created and needs your review";
   if (status === "scraped") return "Source captured and ready for recipe processing";
   if (status === "parsed") return "Ready to review";
   return "Added to your Recipe Book";

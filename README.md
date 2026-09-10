@@ -9,7 +9,7 @@ are connected to Convex; the remaining feature areas still use local mock data.
 
 ### Prerequisites
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - npm
 
 After cloning or pulling the repository, install the dependencies:
@@ -102,9 +102,10 @@ The frontend currently includes the following responsive, navigable flows:
   loading skeletons, status badges, alerts, dialogs, empty-state scaffolding,
   and a custom not-found page.
 
-Dashboard previews, imports, subscriptions, discovery suggestions, and grocery
-data currently come from `lib/data/mock-data.ts`. These can be replaced with
-Convex queries, mutations, and actions incrementally.
+Dashboard previews, subscriptions, discovery suggestions, and grocery screens
+still use some data from `lib/data/mock-data.ts`. The generated recipe and
+grocery-list backend is ready to replace those mocks, but its editing UI is not
+connected yet; see `FRONTEND_DESIGN_GAPS.md` before that frontend pass.
 
 ## Convex project setup
 
@@ -118,9 +119,10 @@ npx convex dev
 
 ## Firecrawl
 
-The project uses Firecrawl's official Convex component. It supports one-page
-scrapes, URL mapping, web search, and durable crawls. The component webhook is
-mounted at `/firecrawl/webhook` on the Convex HTTP Actions URL.
+The project uses Firecrawl's official Convex component. Direct, email-forwarded,
+and trusted agent-discovered recipe URLs run through a durable workflow that
+stores bounded source evidence before agent processing. The component webhook
+is mounted at `/firecrawl/webhook` on the Convex HTTP Actions URL.
 
 Create a Firecrawl API key and set it on your Convex development deployment:
 
@@ -137,6 +139,32 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET
 
 Never put either secret in Git or in client-side environment variables. Each
 developer or deployment must configure its own Convex environment variables.
+
+## OpenAI recipe agent
+
+After Firecrawl stores a recipe artifact, the Convex Agent component uses an
+OpenAI model through the Convex AI Gateway. It creates an editable recipe card,
+saves it to the importing user's Recipe Book, and creates a separate editable
+grocery list from the non-optional ingredients. Agent threads and messages are
+persisted by the component, while normalized recipe and grocery data lives in
+the application's Convex tables.
+
+The default gateway model is `openai/gpt-5-mini`. To use another gateway model,
+set its complete provider/model identifier on the Convex deployment:
+
+```sh
+npx convex env set RECIPE_AGENT_MODEL
+```
+
+No OpenAI key belongs in the frontend or repository. Convex AI Gateway requires
+a supported Convex Cloud deployment and plan. Agent failures are recorded on the
+import, and uncertain or truncated results are marked as needing review.
+
+The backend exposes authenticated operations for editing recipe fields,
+instructions, ingredients, quantities, personal notes, grocery lists, and
+grocery items. Recipe-card removal is a soft deletion so generated grocery data
+can remain independent; deleting a grocery list removes that list and its item
+provenance without deleting the recipe.
 
 ## AgentMail
 

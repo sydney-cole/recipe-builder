@@ -6,7 +6,9 @@ const importStatus = v.union(
   v.literal("queued"),
   v.literal("scraping"),
   v.literal("scraped"),
+  v.literal("processing"),
   v.literal("parsed"),
+  v.literal("needs_review"),
   v.literal("completed"),
   v.literal("failed"),
 );
@@ -66,8 +68,12 @@ export default defineSchema({
     status: importStatus,
     attemptCount: v.number(),
     workflowId: v.optional(v.string()),
+    agentThreadId: v.optional(v.string()),
+    agentModel: v.optional(v.string()),
+    agentWarnings: v.optional(v.array(v.string())),
     scrapeArtifactId: v.optional(v.id("recipeScrapeArtifacts")),
     recipeId: v.optional(v.id("recipes")),
+    generatedGroceryListId: v.optional(v.id("groceryLists")),
     errorMessage: v.optional(v.string()),
     sourceMessageId: v.optional(v.string()),
     sourceEventId: v.optional(v.string()),
@@ -147,11 +153,13 @@ export default defineSchema({
         sodium: v.optional(v.string()),
       }),
     ),
+    deletedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_normalized_source_url", ["normalizedSourceUrl"])
     .index("by_public", ["isPublic"])
+    .index("by_public_and_deleted_at", ["isPublic", "deletedAt"])
     .index("by_import", ["importId"])
     .searchIndex("search_recipes", {
       searchField: "title",
@@ -211,13 +219,16 @@ export default defineSchema({
   groceryLists: defineTable({
     userId: v.id("users"),
     name: v.string(),
+    sourceRecipeId: v.optional(v.id("recipes")),
+    sourceRecipeTitle: v.optional(v.string()),
     status: groceryListStatus,
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_and_status", ["userId", "status"]),
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_user_and_source_recipe", ["userId", "sourceRecipeId"]),
 
   // An item may combine the same ingredient from several recipes. The source
   // rows in `groceryListItemSources` retain that provenance.

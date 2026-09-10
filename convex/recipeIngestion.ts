@@ -141,16 +141,30 @@ export const queueAgentDiscoveredUrl = internalMutation({
 
 export const ingestRecipeSource = recipeIngestionWorkflow.define({
   args: { importId: v.id("recipeImports") },
-  returns: v.id("recipeScrapeArtifacts"),
-  handler: async (step, { importId }): Promise<Id<"recipeScrapeArtifacts">> => {
+  returns: v.id("recipes"),
+  handler: async (step, { importId }): Promise<Id<"recipes">> => {
     await step.runMutation(internal.recipeIngestion.markScraping, { importId });
     const scrape = await step.runAction(internal.recipeIngestion.scrapeRecipePage, {
       importId,
     });
-    return await step.runMutation(internal.recipeIngestion.persistScrape, {
+    await step.runMutation(internal.recipeIngestion.persistScrape, {
       importId,
       scrape,
     });
+    const processing = await step.runMutation(
+      internal.recipeAgentData.ensureProcessingThread,
+      { importId },
+    );
+    const generated = await step.runAction(internal.recipeAgent.extractRecipe, {
+      importId,
+      threadId: processing.threadId,
+      userId: processing.userId,
+    });
+    const persisted = await step.runMutation(
+      internal.recipeAgentData.persistGeneratedRecipe,
+      { importId, model: generated.model, extraction: generated.extraction },
+    );
+    return persisted.recipeId;
   },
 });
 
@@ -165,7 +179,9 @@ export const importForScrape = internalQuery({
         v.literal("queued"),
         v.literal("scraping"),
         v.literal("scraped"),
+        v.literal("processing"),
         v.literal("parsed"),
+        v.literal("needs_review"),
         v.literal("completed"),
         v.literal("failed"),
       ),
@@ -188,7 +204,13 @@ export const markScraping = internalMutation({
   handler: async (ctx, { importId }) => {
     const recipeImport = await ctx.db.get(importId);
     if (recipeImport === null) throw new Error("Recipe import was not found");
-    if (recipeImport.status === "scraped" || recipeImport.status === "completed") {
+    if (
+      recipeImport.status === "scraped" ||
+      recipeImport.status === "processing" ||
+      recipeImport.status === "parsed" ||
+      recipeImport.status === "needs_review" ||
+      recipeImport.status === "completed"
+    ) {
       return null;
     }
     const now = Date.now();
@@ -273,8 +295,8 @@ export const persistScrape = internalMutation({
   },
 });
 
-// This is the narrow handoff contract for the future OpenAI agent. The agent
-// receives source evidence, not a pre-built recipe or grocery list.
+// This remains a narrow inspection contract for agent operations. The agent
+// receives source evidence, not a client-authored recipe or grocery list.
 export const agentReadyArtifact = internalQuery({
   args: { importId: v.id("recipeImports") },
   returns: v.union(
@@ -301,7 +323,14 @@ export const agentReadyArtifact = internalQuery({
   ),
   handler: async (ctx, { importId }) => {
     const recipeImport = await ctx.db.get(importId);
-    if (recipeImport?.status !== "scraped") return null;
+    if (
+      recipeImport === null ||
+      !["scraped", "processing", "parsed", "needs_review", "completed"].includes(
+        recipeImport.status,
+      )
+    ) {
+      return null;
+    }
     const artifact = await ctx.db
       .query("recipeScrapeArtifacts")
       .withIndex("by_import", (q) => q.eq("importId", importId))
@@ -335,7 +364,8 @@ export const onIngestionComplete = internalMutation({
     const recipeImport = await ctx.db.get(context.importId);
     if (
       recipeImport === null ||
-      recipeImport.status === "scraped" ||
+      recipeImport.status === "needs_review" ||
+      recipeImport.status === "completed" ||
       recipeImport.workflowId !== workflowId
     ) {
       return null;
