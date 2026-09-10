@@ -506,3 +506,632 @@ describe("editable grocery lists", () => {
     expect(await asOwner.query(api.groceryLists.get, { listId })).toBeNull();
   });
 });
+
+describe("recipe card validation branches", () => {
+  it("supports clearing optional fields and updating existing notes and ingredients", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "Editor");
+    const recipeId = await createRecipe(t, "branch-recipe", {
+      requestedBy: ownerId,
+    });
+    const asOwner = t.withIdentity({ subject: ownerId });
+
+    await expect(
+      t.mutation(api.recipeCards.updateCard, { recipeId, title: "No session" }),
+    ).rejects.toThrow(/Unauthenticated/);
+    await expect(
+      asOwner.mutation(api.recipeCards.updateCard, { recipeId, title: "   " }),
+    ).rejects.toThrow(/title/);
+    await expect(
+      asOwner.mutation(api.recipeCards.updateCard, { recipeId, servings: -1 }),
+    ).rejects.toThrow(/servings/);
+    await expect(
+      asOwner.mutation(api.recipeCards.updateCard, {
+        recipeId,
+        instructions: [{ position: 1, text: " " }],
+      }),
+    ).rejects.toThrow(/instruction/);
+
+    await asOwner.mutation(api.recipeCards.updateCard, {
+      recipeId,
+      description: null,
+      yieldText: "  ",
+      servings: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: 12,
+      totalTimeMinutes: 12,
+      instructions: [
+        { position: 9, text: "  Stir gently.  ", section: "  Sauce  " },
+      ],
+    });
+    await asOwner.mutation(api.recipeCards.setNotes, {
+      recipeId,
+      notes: "First note",
+    });
+    await asOwner.mutation(api.recipeCards.setNotes, {
+      recipeId,
+      notes: "Updated note",
+    });
+    await asOwner.mutation(api.recipeCards.setNotes, {
+      recipeId,
+      notes: null,
+    });
+
+    const firstIngredientId = await asOwner.mutation(
+      api.recipeCards.addIngredient,
+      {
+        recipeId,
+        name: "  Garlic  ",
+        originalText: "2 cloves garlic",
+        quantity: 2,
+        quantityText: "2",
+        unit: "cloves",
+        section: "Sauce",
+        preparation: "minced",
+        notes: "fresh",
+        isOptional: false,
+      },
+    );
+    const secondIngredientId = await asOwner.mutation(
+      api.recipeCards.addIngredient,
+      {
+        recipeId,
+        name: "Garlic",
+        quantity: null,
+        quantityText: null,
+        unit: null,
+        section: null,
+        preparation: null,
+        notes: null,
+        isOptional: true,
+      },
+    );
+    await asOwner.mutation(api.recipeCards.updateIngredient, {
+      recipeIngredientId: firstIngredientId,
+      name: "Roasted garlic",
+      originalText: "3 cloves roasted garlic",
+      quantity: null,
+      quantityText: null,
+      unit: null,
+      section: null,
+      preparation: null,
+      notes: null,
+      isOptional: true,
+    });
+
+    const detail = await asOwner.query(api.recipes.get, { recipeId });
+    expect(detail?.recipe).toMatchObject({
+      cookTimeMinutes: 12,
+      totalTimeMinutes: 12,
+      instructions: [
+        { position: 1, text: "Stir gently.", section: "Sauce" },
+      ],
+    });
+    expect(detail?.recipe.description).toBeUndefined();
+    expect(detail?.recipe.servings).toBeUndefined();
+    expect(detail?.saved?.notes).toBeUndefined();
+    expect(detail?.ingredients).toHaveLength(2);
+    expect(detail?.ingredients[0]).toMatchObject({
+      name: "Roasted garlic",
+      isOptional: true,
+    });
+
+    await asOwner.mutation(api.recipeCards.removeIngredient, {
+      recipeIngredientId: secondIngredientId,
+    });
+    await asOwner.mutation(api.recipeCards.removeIngredient, {
+      recipeIngredientId: secondIngredientId,
+    });
+    await expect(
+      asOwner.mutation(api.recipeCards.updateIngredient, {
+        recipeIngredientId: secondIngredientId,
+        quantity: 1,
+      }),
+    ).rejects.toThrow(/not found/);
+  });
+
+  it("rejects non-editable recipes and enforces the ingredient limit", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "LimitCook");
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const standaloneRecipeId = await t.run(async (ctx) => {
+      const now = Date.now();
+      return await ctx.db.insert("recipes", {
+        sourceUrl: "https://example.com/public",
+        normalizedSourceUrl: "https://example.com/public",
+        title: "Standalone",
+        cuisines: [],
+        categories: [],
+        keywords: [],
+        instructions: [],
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    await expect(
+      asOwner.mutation(api.recipeCards.updateCard, {
+        recipeId: standaloneRecipeId,
+        title: "Cannot edit",
+      }),
+    ).rejects.toThrow(/not editable/);
+
+    const recipeId = await createRecipe(t, "full-recipe", {
+      requestedBy: ownerId,
+    });
+    await t.run(async (ctx) => {
+      for (let position = 1; position <= 200; position += 1) {
+        await ctx.db.insert("recipeIngredients", {
+          recipeId,
+          position,
+          originalText: `Ingredient ${position}`,
+          name: `Ingredient ${position}`,
+          normalizedName: `ingredient ${position}`,
+          isOptional: false,
+        });
+      }
+    });
+    await expect(
+      asOwner.mutation(api.recipeCards.addIngredient, {
+        recipeId,
+        name: "One too many",
+      }),
+    ).rejects.toThrow(/at most 200/);
+
+    await asOwner.mutation(api.recipeCards.removeCard, { recipeId });
+    await expect(
+      asOwner.mutation(api.recipeCards.updateCard, {
+        recipeId,
+        title: "Deleted",
+      }),
+    ).rejects.toThrow(/not found/);
+  });
+});
+
+describe("grocery list validation branches", () => {
+  it("covers anonymous access, nullable edits, item deletion, and validation", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "ListEditor");
+    const otherId = await createUser(t, "ListViewer");
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const asOther = t.withIdentity({ subject: otherId });
+
+    await expect(t.query(api.groceryLists.listMine)).rejects.toThrow(
+      /Unauthenticated/,
+    );
+    await expect(
+      t.mutation(api.groceryLists.create, { name: "Anonymous" }),
+    ).rejects.toThrow(/Unauthenticated/);
+    await expect(
+      asOwner.mutation(api.groceryLists.create, { name: "  " }),
+    ).rejects.toThrow(/List name/);
+
+    const listId = await asOwner.mutation(api.groceryLists.create, {
+      name: "Editable list",
+    });
+    expect(await asOther.query(api.groceryLists.get, { listId })).toBeNull();
+    expect(await asOwner.query(api.groceryLists.listMine)).toHaveLength(1);
+    await expect(
+      asOwner.mutation(api.groceryLists.updateList, { listId, name: " " }),
+    ).rejects.toThrow(/List name/);
+    await asOwner.mutation(api.groceryLists.updateList, {
+      listId,
+      status: "active",
+    });
+    await expect(
+      asOwner.mutation(api.groceryLists.addItem, { listId, name: " " }),
+    ).rejects.toThrow(/Item name/);
+    await expect(
+      asOwner.mutation(api.groceryLists.addItem, {
+        listId,
+        name: "Milk",
+        quantity: -1,
+      }),
+    ).rejects.toThrow(/Quantity/);
+
+    const firstItemId = await asOwner.mutation(api.groceryLists.addItem, {
+      listId,
+      name: "Milk",
+    });
+    const secondItemId = await asOwner.mutation(api.groceryLists.addItem, {
+      listId,
+      name: "Bread",
+      quantity: null,
+      quantityText: null,
+      unit: null,
+      category: null,
+      notes: null,
+    });
+    await asOwner.mutation(api.groceryLists.updateItem, {
+      itemId: firstItemId,
+      quantity: null,
+      quantityText: null,
+      unit: null,
+      category: null,
+      notes: null,
+      sortOrder: 4,
+    });
+    await expect(
+      asOwner.mutation(api.groceryLists.updateItem, {
+        itemId: firstItemId,
+        sortOrder: -1,
+      }),
+    ).rejects.toThrow(/Sort order/);
+    await expect(
+      asOwner.mutation(api.groceryLists.updateItem, {
+        itemId: firstItemId,
+        quantity: Number.POSITIVE_INFINITY,
+      }),
+    ).rejects.toThrow();
+
+    await asOwner.mutation(api.groceryLists.removeItem, {
+      itemId: secondItemId,
+    });
+    await expect(
+      asOwner.mutation(api.groceryLists.removeItem, {
+        itemId: secondItemId,
+      }),
+    ).rejects.toThrow(/not found/);
+  });
+
+  it("cleans generated-list provenance and enforces the item limit", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "BulkShopper");
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const recipeId = await createRecipe(t, "list-source", {
+      requestedBy: ownerId,
+    });
+    const { listId, sourcedItemId, importId } = await t.run(async (ctx) => {
+      const recipe = await ctx.db.get(recipeId);
+      if (recipe?.importId === undefined) throw new Error("Missing test import");
+      const now = Date.now();
+      const generatedListId = await ctx.db.insert("groceryLists", {
+        userId: ownerId,
+        name: "Generated",
+        sourceRecipeId: recipeId,
+        sourceRecipeTitle: "list-source",
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const recipeIngredientId = await ctx.db.insert("recipeIngredients", {
+        recipeId,
+        position: 1,
+        originalText: "1 apple",
+        name: "Apple",
+        normalizedName: "apple",
+        isOptional: false,
+      });
+      const itemId = await ctx.db.insert("groceryListItems", {
+        listId: generatedListId,
+        name: "Apple",
+        normalizedName: "apple",
+        isChecked: false,
+        sortOrder: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("groceryListItemSources", {
+        groceryListItemId: itemId,
+        recipeId,
+        recipeIngredientId,
+        servingsMultiplier: 1,
+        createdAt: now,
+      });
+      await ctx.db.patch(recipe.importId, {
+        generatedGroceryListId: generatedListId,
+      });
+      for (let position = 2; position <= 500; position += 1) {
+        await ctx.db.insert("groceryListItems", {
+          listId: generatedListId,
+          name: `Item ${position}`,
+          normalizedName: `item ${position}`,
+          isChecked: false,
+          sortOrder: position,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      return {
+        listId: generatedListId,
+        sourcedItemId: itemId,
+        importId: recipe.importId,
+      };
+    });
+
+    await expect(
+      asOwner.mutation(api.groceryLists.addItem, {
+        listId,
+        name: "Overflow",
+      }),
+    ).rejects.toThrow(/at most 500/);
+    await asOwner.mutation(api.groceryLists.removeItem, {
+      itemId: sourcedItemId,
+    });
+    await asOwner.mutation(api.groceryLists.removeList, { listId });
+    await t.run(async (ctx) => {
+      expect((await ctx.db.get(importId))?.generatedGroceryListId).toBeUndefined();
+    });
+  });
+});
+
+describe("agent review and ingestion error branches", () => {
+  it("marks truncated, uncertain output for review and reuses catalog entries", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "Reviewer");
+    const importId = await t.run(async (ctx) => {
+      const now = Date.now();
+      await ctx.db.insert("ingredients", {
+        name: "Salt",
+        normalizedName: "salt",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const id = await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "not-a-valid-url",
+        normalizedUrl: "not-a-valid-url",
+        status: "processing",
+        attemptCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("recipeScrapeArtifacts", {
+        importId: id,
+        sourceUrl: "not-a-valid-url",
+        normalizedUrl: "not-a-valid-url",
+        markdown: "A partial recipe",
+        truncated: true,
+        scrapedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return id;
+    });
+    const extraction = {
+      title: "Partial Soup",
+      description: null,
+      sourceSite: null,
+      sourceAuthor: null,
+      yieldText: null,
+      servings: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      totalTimeMinutes: null,
+      cuisines: [],
+      categories: [],
+      keywords: [],
+      instructions: [{ position: 4, text: "Simmer.", section: "Soup" }],
+      ingredients: [
+        {
+          position: 3,
+          section: "Soup",
+          originalText: "Salt to taste",
+          name: "Salt",
+          normalizedName: "   ",
+          quantity: null,
+          quantityText: null,
+          unit: null,
+          preparation: null,
+          notes: null,
+          category: null,
+          isOptional: false,
+        },
+      ],
+      warnings: ["  Quantity was unclear.  ", ""],
+    };
+
+    const result = await t.mutation(
+      internal.recipeAgentData.persistGeneratedRecipe,
+      { importId, model: "openai/test-model", extraction },
+    );
+    expect(result.needsReview).toBe(true);
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(importId)).toMatchObject({
+        status: "needs_review",
+        agentWarnings: [
+          "Quantity was unclear.",
+          "The source scrape was truncated; review the generated recipe.",
+        ],
+      });
+      expect(await ctx.db.get(result.recipeId)).toMatchObject({
+        title: "Partial Soup",
+        instructions: [{ position: 1, text: "Simmer.", section: "Soup" }],
+      });
+    });
+  });
+
+  it("rejects missing ownership, evidence, and incomplete agent output", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "ErrorCase");
+    const baseExtraction = {
+      title: "Recipe",
+      description: null,
+      sourceSite: null,
+      sourceAuthor: null,
+      yieldText: null,
+      servings: null,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      totalTimeMinutes: null,
+      cuisines: [],
+      categories: [],
+      keywords: [],
+      instructions: [{ position: 1, text: "Cook.", section: null }],
+      ingredients: [
+        {
+          position: 1,
+          section: null,
+          originalText: "1 egg",
+          name: "Egg",
+          normalizedName: "egg",
+          quantity: 1,
+          quantityText: "1",
+          unit: null,
+          preparation: null,
+          notes: null,
+          category: null,
+          isOptional: false,
+        },
+      ],
+      warnings: [],
+    };
+    const { ownerlessId, noArtifactId, incompleteId } = await t.run(
+      async (ctx) => {
+        const now = Date.now();
+        const ownerless = await ctx.db.insert("recipeImports", {
+          sourceUrl: "https://example.com/ownerless",
+          normalizedUrl: "https://example.com/ownerless",
+          status: "processing",
+          attemptCount: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const noArtifact = await ctx.db.insert("recipeImports", {
+          requestedBy: userId,
+          sourceUrl: "https://example.com/no-artifact",
+          normalizedUrl: "https://example.com/no-artifact",
+          status: "processing",
+          attemptCount: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const incomplete = await ctx.db.insert("recipeImports", {
+          requestedBy: userId,
+          sourceUrl: "https://example.com/incomplete",
+          normalizedUrl: "https://example.com/incomplete",
+          status: "processing",
+          attemptCount: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await ctx.db.insert("recipeScrapeArtifacts", {
+          importId: incomplete,
+          sourceUrl: "https://example.com/incomplete",
+          normalizedUrl: "https://example.com/incomplete",
+          markdown: "Not complete",
+          truncated: false,
+          scrapedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+        return {
+          ownerlessId: ownerless,
+          noArtifactId: noArtifact,
+          incompleteId: incomplete,
+        };
+      },
+    );
+
+    await expect(
+      t.mutation(internal.recipeAgentData.persistGeneratedRecipe, {
+        importId: ownerlessId,
+        model: "openai/test-model",
+        extraction: baseExtraction,
+      }),
+    ).rejects.toThrow(/owning user/);
+    await expect(
+      t.mutation(internal.recipeAgentData.persistGeneratedRecipe, {
+        importId: noArtifactId,
+        model: "openai/test-model",
+        extraction: baseExtraction,
+      }),
+    ).rejects.toThrow(/artifact/);
+    await expect(
+      t.mutation(internal.recipeAgentData.persistGeneratedRecipe, {
+        importId: incompleteId,
+        model: "openai/test-model",
+        extraction: { ...baseExtraction, ingredients: [] },
+      }),
+    ).rejects.toThrow(/complete recipe/);
+
+    expect(
+      await t.query(internal.recipeAgentData.processingInput, {
+        importId: noArtifactId,
+      }),
+    ).toBeNull();
+    expect(
+      await t.query(internal.recipeIngestion.agentReadyArtifact, {
+        importId: noArtifactId,
+      }),
+    ).toBeNull();
+  });
+
+  it("covers import state transitions and completion outcomes", async () => {
+    const t = initTest();
+    const missingImportId = await t.run(async (ctx) => {
+      const now = Date.now();
+      const id = await ctx.db.insert("recipeImports", {
+        sourceUrl: "https://example.com/deleted",
+        normalizedUrl: "https://example.com/deleted",
+        status: "queued",
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.delete(id);
+      return id;
+    });
+    expect(
+      await t.query(internal.recipeIngestion.importForScrape, {
+        importId: missingImportId,
+      }),
+    ).toBeNull();
+    await expect(
+      t.mutation(internal.recipeIngestion.markScraping, {
+        importId: missingImportId,
+      }),
+    ).rejects.toThrow(/not found/);
+
+    const importId = await t.run(async (ctx) => {
+      const now = Date.now();
+      return await ctx.db.insert("recipeImports", {
+        sourceUrl: "https://example.com/state",
+        normalizedUrl: "https://example.com/state",
+        workflowId: "workflow-state",
+        status: "queued",
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    await t.mutation(internal.recipeIngestion.markScraping, { importId });
+    await t.mutation(internal.recipeIngestion.markScraping, { importId });
+    await t.mutation(internal.recipeIngestion.onIngestionComplete, {
+      workflowId: "workflow-state",
+      context: { importId },
+      result: { kind: "canceled" },
+    });
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(importId)).toMatchObject({
+        status: "failed",
+        errorMessage: "Recipe ingestion was canceled",
+      });
+    });
+
+    const completedId = await t.run(async (ctx) => {
+      const now = Date.now();
+      return await ctx.db.insert("recipeImports", {
+        sourceUrl: "https://example.com/completed",
+        normalizedUrl: "https://example.com/completed",
+        workflowId: "workflow-complete",
+        status: "completed",
+        attemptCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+    await t.mutation(internal.recipeIngestion.onIngestionComplete, {
+      workflowId: "workflow-complete",
+      context: { importId: completedId },
+      result: { kind: "failed", error: "Ignored" },
+    });
+    await t.mutation(internal.recipeIngestion.onIngestionComplete, {
+      workflowId: "workflow-complete",
+      context: { importId: completedId },
+      result: { kind: "success", returnValue: null },
+    });
+    await t.run(async (ctx) => {
+      expect((await ctx.db.get(completedId))?.status).toBe("completed");
+    });
+  });
+});
