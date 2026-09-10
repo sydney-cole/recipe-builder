@@ -11,8 +11,8 @@ before building the corresponding frontend.
   the OpenAI agent converts Firecrawl evidence into structured data.
 - **Review-needed state:** placement and hierarchy for agent warnings, truncated
   scrape warnings, and the action that acknowledges a generated recipe.
-- **Generated-result handoff:** whether a completed import opens the recipe,
-  opens the generated grocery list, or presents both as next actions.
+- **Generated-result handoff:** how a completed import opens the recipe and
+  presents the user-controlled action for creating its grocery list.
 
 ## Recipe Book cards and recipe editing
 
@@ -32,14 +32,16 @@ before building the corresponding frontend.
 
 ## Generated grocery lists
 
-- **List creation notice:** how to explain that non-optional recipe ingredients
-  were automatically placed in a recipe-specific list.
+- **List creation action:** refine the placement and confirmation behavior for
+  the implemented **Create list** action, which copies non-optional recipe
+  ingredients into a recipe-named list.
 - **Recipe relationship:** presentation for “Generated from [recipe]” and what
   remains when the recipe card is later removed.
 - **Editing controls:** final responsive treatment for adding, renaming,
   reordering, checking, changing quantities/units, and removing grocery items.
-- **Whole-list deletion:** confirmation, undo policy, and the destination after
-  deleting a generated or manually created list.
+- **Whole-list actions:** deletion and user-named merging are now implemented in
+  the overflow menu. A merge replaces both source lists; final responsive
+  styling, undo policy, and success feedback still need design review.
 - **Optional ingredients:** an affordance for copying optional recipe ingredients
   into the grocery list later is not designed.
 - **Quantity semantics:** behavior for ranges, fractions, unknown quantities, and

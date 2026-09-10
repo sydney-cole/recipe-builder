@@ -73,7 +73,7 @@ export default function RecipeBookPage() {
       ) : recipes.length === 0 ? (
         <EmptyState icon={BookOpen} title="No recipes found" description={search ? "Try a different search." : "Import a recipe to start your collection."} />
       ) : (
-        <div className="grid-auto">{recipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}</div>
+        <div className="grid-auto">{recipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} canCreateGroceryList />)}</div>
       )}
     </div>
   );

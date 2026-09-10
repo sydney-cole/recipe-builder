@@ -6,6 +6,7 @@ import { BookCheck, BookPlus, Clock3, ShoppingBasket, Users } from "lucide-react
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { AddRecipeToListButton } from "@/components/grocery/add-recipe-to-list-button";
 import { FoodArt } from "./food-art";
 import type { Recipe } from "@/lib/data/types";
 
@@ -13,10 +14,12 @@ export function RecipeCard({
   recipe,
   suggested = false,
   detailsHref = `/app/recipe-book/${recipe.id}`,
+  canCreateGroceryList = false,
 }: {
   recipe: Recipe;
   suggested?: boolean;
   detailsHref?: string | null;
+  canCreateGroceryList?: boolean;
 }) {
   const [saved, setSaved] = useState(!suggested);
   return (
@@ -39,7 +42,19 @@ export function RecipeCard({
           <Button variant={saved ? "secondary" : "default"} size="sm" onClick={() => setSaved(true)} disabled={saved}>
             {saved ? <BookCheck size={16} /> : <BookPlus size={16} />}{saved ? "In Recipe Book" : "Add to Recipe Book"}
           </Button>
-          <Button asChild variant="secondary" size="sm"><Link href="/app/grocery-lists"><ShoppingBasket size={16} />Add to list</Link></Button>
+          {canCreateGroceryList ? (
+            <AddRecipeToListButton recipeId={recipe.id} size="sm" />
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled
+              title="Save this recipe before creating a grocery list"
+            >
+              <ShoppingBasket size={16} />
+              Create list
+            </Button>
+          )}
         </div>
         <p className="text-xs text-muted-foreground">Source: {recipe.source}</p>
       </CardContent>

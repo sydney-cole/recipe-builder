@@ -3,10 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RecipeBookPage from "./page";
 
-const queryState = vi.hoisted(() => ({ value: undefined as unknown }));
+const queryState = vi.hoisted(() => ({
+  value: undefined as unknown,
+  createFromRecipe: vi.fn(),
+}));
 
 vi.mock("convex/react", () => ({
   useQuery: () => queryState.value,
+  useMutation: () => queryState.createFromRecipe,
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 const recipes = [

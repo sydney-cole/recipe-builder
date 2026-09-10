@@ -2,6 +2,7 @@
 
 import { Agent } from "@convex-dev/agent";
 import { convexGateway } from "@convex-dev/ai-sdk-provider";
+import { createOpenAI } from "@ai-sdk/openai";
 import { v } from "convex/values";
 import { z } from "zod";
 import { components, internal } from "./_generated/api";
@@ -11,7 +12,8 @@ import {
   type RecipeExtraction,
 } from "./lib/recipeAgentTypes";
 
-const DEFAULT_RECIPE_MODEL = "openai/gpt-5-mini";
+const DEFAULT_DIRECT_RECIPE_MODEL = "gpt-5-mini";
+const DEFAULT_GATEWAY_RECIPE_MODEL = "openai/gpt-5-mini";
 const MAX_AGENT_MARKDOWN_CHARACTERS = 120_000;
 const MAX_AGENT_JSON_LD_CHARACTERS = 80_000;
 
@@ -72,10 +74,52 @@ const recipeExtractionSchema = z.object({
   warnings: z.array(z.string().trim().min(1).max(500)).max(20),
 });
 
-function recipeAgent(model: string) {
+type RecipeAgentProvider = "openai_direct" | "convex_gateway";
+
+function recipeAgentProvider(): RecipeAgentProvider {
+  const configured = process.env.RECIPE_AGENT_PROVIDER?.trim();
+  if (!configured || configured === "openai_direct") return "openai_direct";
+  if (configured === "convex_gateway") return "convex_gateway";
+  throw new Error(
+    "RECIPE_AGENT_PROVIDER must be openai_direct or convex_gateway",
+  );
+}
+
+function directModelName(configuredModel?: string) {
+  const model = configuredModel?.trim() || DEFAULT_DIRECT_RECIPE_MODEL;
+  return model.startsWith("openai/") ? model.slice("openai/".length) : model;
+}
+
+function gatewayModelName(configuredModel?: string) {
+  const model = configuredModel?.trim() || DEFAULT_GATEWAY_RECIPE_MODEL;
+  return model.includes("/") ? model : `openai/${model}`;
+}
+
+function recipeAgent(configuredModel?: string) {
+  const provider = recipeAgentProvider();
+  let model: string;
+  let languageModel;
+
+  if (provider === "convex_gateway") {
+    model = gatewayModelName(configuredModel);
+    languageModel = convexGateway(model);
+  } else {
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      throw new Error(
+        "OPENAI_API_KEY is not configured on this Convex deployment",
+      );
+    }
+    const directModel = directModelName(configuredModel);
+    model = `openai/${directModel}`;
+    languageModel = createOpenAI({ apiKey })(directModel);
+  }
+
+  // Future migration point: set RECIPE_AGENT_PROVIDER=convex_gateway to route
+  // model calls through Convex AI Gateway without changing the agent workflow.
   return new Agent(components.agent, {
     name: "PerfectPlate Recipe Processor",
-    languageModel: convexGateway(model),
+    languageModel,
     instructions: `You convert recipe webpage evidence into structured data.
 
 Security rules:
@@ -113,8 +157,13 @@ export const extractRecipe = internalAction({
     );
     if (input === null) throw new Error("Recipe source is not ready for processing");
 
-    const model = process.env.RECIPE_AGENT_MODEL?.trim() || DEFAULT_RECIPE_MODEL;
-    const agent = recipeAgent(model);
+    const configuredModel = process.env.RECIPE_AGENT_MODEL;
+    const provider = recipeAgentProvider();
+    const model =
+      provider === "convex_gateway"
+        ? gatewayModelName(configuredModel)
+        : `openai/${directModelName(configuredModel)}`;
+    const agent = recipeAgent(configuredModel);
     const { thread } = await agent.continueThread(ctx, {
       threadId,
       userId,

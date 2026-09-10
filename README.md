@@ -3,7 +3,8 @@
 PerfectPlate is an email-powered recipe organizer and meal-planning application.
 The current implementation provides a frontend built with Next.js, TypeScript,
 Tailwind CSS, and shadcn-style UI components. Account access and the Recipe Book
-are connected to Convex; the remaining feature areas still use local mock data.
+are connected to Convex; discovery and subscription flows still use local mock
+data while their backend integrations are being built.
 
 ## Run the code locally
 
@@ -80,32 +81,34 @@ The frontend currently includes the following responsive, navigable flows:
 - **Application shell:** responsive desktop sidebar, top navigation, and a
   five-item mobile bottom navigation.
 - **Dashboard:** quick access to recipe discovery, email imports, grocery lists,
-  recently saved recipes, and items needing attention.
+  and realtime recently saved recipes.
 - **Recipe discovery:** search scaffolding for ingredients, moods, and recipe
   types, including removable search terms and explained mock recommendations.
 - **Recipe Book:** Convex-backed, searchable and sortable recipe gallery with
   links to detailed recipe pages and their ingredients and instructions.
 - **Recipe details:** ingredients, cooking instructions, working serving
-  controls, source attribution, and a link into grocery-list planning.
+  controls, source attribution, and on-demand grocery-list creation.
 - **Recipe importing:** authenticated users can provision an AgentMail inbox,
   email or paste recipe links, and see Convex-backed import states. Inbound
   AgentMail webhooks are verified and deduplicated by the component. Firecrawl
-  extraction from the queued links is the next integration step.
+  extracts queued links before the OpenAI recipe agent creates saved cards.
 - **Food-blog subscriptions:** add and manage mock food-blog/newsletter
   subscriptions with active, pending, and paused states.
 - **Grocery lists:** list overview plus an interactive editor that can add,
   rename, check off, remove, restore, and change the quantity or unit of grocery
-  items.
+  items. Users can create recipe-named lists from saved recipe ingredients,
+  merge two lists into a user-named replacement, delete a list, and save new or
+  existing lists atomically to Convex.
 - **Settings:** frontend controls for profile details, recipe inbox information,
   and notification preferences.
 - **Design-system states:** responsive layouts, accessible focus behavior,
   loading skeletons, status badges, alerts, dialogs, empty-state scaffolding,
   and a custom not-found page.
 
-Dashboard previews, subscriptions, discovery suggestions, and grocery screens
-still use some data from `lib/data/mock-data.ts`. The generated recipe and
-grocery-list backend is ready to replace those mocks, but its editing UI is not
-connected yet; see `FRONTEND_DESIGN_GAPS.md` before that frontend pass.
+Subscriptions, discovery suggestions, and the example "This week" grocery card
+still use some data from `lib/data/mock-data.ts`.
+Generated recipe lists and manually created lists use the Convex-backed editor;
+see `FRONTEND_DESIGN_GAPS.md` for remaining design decisions.
 
 ## Convex project setup
 
@@ -143,22 +146,35 @@ developer or deployment must configure its own Convex environment variables.
 ## OpenAI recipe agent
 
 After Firecrawl stores a recipe artifact, the Convex Agent component uses an
-OpenAI model through the Convex AI Gateway. It creates an editable recipe card,
-saves it to the importing user's Recipe Book, and creates a separate editable
-grocery list from the non-optional ingredients. Agent threads and messages are
-persisted by the component, while normalized recipe and grocery data lives in
-the application's Convex tables.
+OpenAI model through OpenAI's API directly. It creates an editable recipe card,
+saves it to the importing user's Recipe Book, and stores its structured
+ingredients. A separate grocery list is created from the non-optional
+ingredients only when the user selects **Create list** on that recipe. Agent
+threads and messages are still persisted by the Convex Agent component, while
+normalized recipe and grocery data lives in the application's Convex tables.
 
-The default gateway model is `openai/gpt-5-mini`. To use another gateway model,
-set its complete provider/model identifier on the Convex deployment:
+Create an OpenAI API key and store it only on the Convex deployment:
+
+```sh
+npx convex env set OPENAI_API_KEY
+```
+
+The default direct model is `gpt-5-mini`. To use another OpenAI model, set its
+model identifier on the same deployment:
 
 ```sh
 npx convex env set RECIPE_AGENT_MODEL
 ```
 
-No OpenAI key belongs in the frontend or repository. Convex AI Gateway requires
-a supported Convex Cloud deployment and plan. Agent failures are recorded on the
-import, and uncertain or truncated results are marked as needing review.
+No OpenAI key belongs in the frontend, `.env.local`, or repository. Agent
+failures are recorded on the import, and uncertain or truncated results are
+marked as needing review.
+
+The provider selection lives in `convex/recipeAgent.ts`. A future move back to
+Convex AI Gateway requires no workflow rewrite: enable a supported Convex plan
+and set `RECIPE_AGENT_PROVIDER=convex_gateway`. The same file keeps the gateway
+adapter and normalizes `RECIPE_AGENT_MODEL` to the gateway's
+`provider/model` format.
 
 The backend exposes authenticated operations for editing recipe fields,
 instructions, ingredients, quantities, personal notes, grocery lists, and

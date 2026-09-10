@@ -30,6 +30,7 @@
   "homepage": "https://github.com/sydney-cole/recipe-builder#readme",
   "dependencies": {
     "@agentmail/convex": "^0.1.0",
+    "@ai-sdk/openai": "^4.0.65",
     "@auth/core": "^0.41.3",
     "@convex-dev/agent": "^0.7.2",
     "@convex-dev/ai-sdk-provider": "^0.1.0",

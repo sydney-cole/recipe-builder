@@ -22,10 +22,7 @@ describe("RecipeCard", () => {
       "href",
       "/app/recipe-book/orzo",
     );
-    expect(screen.getByRole("link", { name: "Add to list" })).toHaveAttribute(
-      "href",
-      "/app/grocery-lists",
-    );
+    expect(screen.getByRole("button", { name: "Create list" })).toBeDisabled();
   });
 
   it("does not create broken detail links for preview cards", async () => {

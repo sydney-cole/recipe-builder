@@ -115,7 +115,6 @@ export const persistGeneratedRecipe = internalMutation({
   },
   returns: v.object({
     recipeId: v.id("recipes"),
-    groceryListId: v.id("groceryLists"),
     needsReview: v.boolean(),
   }),
   handler: async (ctx, { importId, model, extraction }) => {
@@ -124,13 +123,9 @@ export const persistGeneratedRecipe = internalMutation({
     if (recipeImport.requestedBy === undefined) {
       throw new Error("Recipe import has no owning user");
     }
-    if (
-      recipeImport.recipeId !== undefined &&
-      recipeImport.generatedGroceryListId !== undefined
-    ) {
+    if (recipeImport.recipeId !== undefined) {
       return {
         recipeId: recipeImport.recipeId,
-        groceryListId: recipeImport.generatedGroceryListId,
         needsReview: recipeImport.status === "needs_review",
       };
     }
@@ -182,17 +177,6 @@ export const persistGeneratedRecipe = internalMutation({
       updatedAt: now,
     });
 
-    const groceryListId = await ctx.db.insert("groceryLists", {
-      userId: recipeImport.requestedBy,
-      name: `${extraction.title.trim()} ingredients`,
-      sourceRecipeId: recipeId,
-      sourceRecipeTitle: extraction.title.trim(),
-      status: "active",
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    let grocerySortOrder = 0;
     for (const [index, ingredient] of extraction.ingredients.entries()) {
       const normalizedName =
         normalizeIngredientName(ingredient.normalizedName) ||
@@ -218,7 +202,7 @@ export const persistGeneratedRecipe = internalMutation({
         throw new Error("Ingredient catalog write failed");
       }
 
-      const recipeIngredientId = await ctx.db.insert("recipeIngredients", {
+      await ctx.db.insert("recipeIngredients", {
         recipeId,
         ingredientId: catalogIngredient._id,
         position: index + 1,
@@ -233,35 +217,6 @@ export const persistGeneratedRecipe = internalMutation({
         notes: optional(ingredient.notes),
         isOptional: ingredient.isOptional,
       });
-
-      // The generated list contains necessary ingredients only. Optional lines
-      // remain on the editable recipe card and can be added manually later.
-      if (ingredient.isOptional) continue;
-      grocerySortOrder += 1;
-      const groceryListItemId = await ctx.db.insert("groceryListItems", {
-        listId: groceryListId,
-        ingredientId: catalogIngredient._id,
-        name: ingredient.name.trim(),
-        normalizedName,
-        quantity: optional(ingredient.quantity),
-        quantityText: optional(ingredient.quantityText),
-        unit: optional(ingredient.unit),
-        category: optional(ingredient.category),
-        notes: optional(ingredient.notes),
-        isChecked: false,
-        sortOrder: grocerySortOrder,
-        createdAt: now,
-        updatedAt: now,
-      });
-      await ctx.db.insert("groceryListItemSources", {
-        groceryListItemId,
-        recipeId,
-        recipeIngredientId,
-        servingsMultiplier: 1,
-        quantityAdded: optional(ingredient.quantity),
-        quantityTextAdded: optional(ingredient.quantityText),
-        createdAt: now,
-      });
     }
 
     const warnings = [
@@ -273,7 +228,6 @@ export const persistGeneratedRecipe = internalMutation({
     const needsReview = warnings.length > 0;
     await ctx.db.patch(importId, {
       recipeId,
-      generatedGroceryListId: groceryListId,
       agentModel: model,
       agentWarnings: warnings,
       status: needsReview ? "needs_review" : "completed",
@@ -281,6 +235,6 @@ export const persistGeneratedRecipe = internalMutation({
       finishedAt: now,
       updatedAt: now,
     });
-    return { recipeId, groceryListId, needsReview };
+    return { recipeId, needsReview };
   },
 });

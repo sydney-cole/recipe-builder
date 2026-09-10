@@ -287,7 +287,7 @@ describe("recipe scrape persistence", () => {
 });
 
 describe("agent-generated recipe persistence", () => {
-  it("atomically creates an editable recipe card and necessary-ingredient list", async () => {
+  it("creates a recipe first and adds required ingredients only on request", async () => {
     const t = initTest();
     const userId = await createUser(t, "Mina");
     const importId = await t.run(async (ctx) => {
@@ -374,14 +374,13 @@ describe("agent-generated recipe persistence", () => {
 
     await t.run(async (ctx) => {
       const recipe = await ctx.db.get(first.recipeId);
-      const list = await ctx.db.get(first.groceryListId);
       const recipeIngredients = await ctx.db
         .query("recipeIngredients")
         .withIndex("by_recipe", (q) => q.eq("recipeId", first.recipeId))
         .collect();
-      const groceryItems = await ctx.db
-        .query("groceryListItems")
-        .withIndex("by_list", (q) => q.eq("listId", first.groceryListId))
+      const groceryLists = await ctx.db
+        .query("groceryLists")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .collect();
       const saved = await ctx.db
         .query("savedRecipes")
@@ -393,14 +392,40 @@ describe("agent-generated recipe persistence", () => {
         title: "Lemon Pasta",
         sourceUrl: "https://kitchen.example/lemon-pasta",
       });
-      expect(list).toMatchObject({
-        name: "Lemon Pasta ingredients",
+      expect(recipeIngredients).toHaveLength(2);
+      expect(groceryLists).toHaveLength(0);
+      expect(saved?.userId).toBe(userId);
+    });
+
+    const asUser = t.withIdentity({ subject: userId });
+    await expect(
+      t.mutation(api.groceryLists.createFromRecipe, {
+        recipeId: first.recipeId,
+      }),
+    ).rejects.toThrow(/Unauthenticated/);
+    const groceryListId = await asUser.mutation(
+      api.groceryLists.createFromRecipe,
+      { recipeId: first.recipeId },
+    );
+    expect(
+      await asUser.mutation(api.groceryLists.createFromRecipe, {
+        recipeId: first.recipeId,
+      }),
+    ).toBe(groceryListId);
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(groceryListId)).toMatchObject({
+        name: "Lemon Pasta",
         sourceRecipeId: first.recipeId,
       });
-      expect(recipeIngredients).toHaveLength(2);
+      const groceryItems = await ctx.db
+        .query("groceryListItems")
+        .withIndex("by_list", (q) => q.eq("listId", groceryListId))
+        .collect();
       expect(groceryItems).toHaveLength(1);
       expect(groceryItems[0]).toMatchObject({ name: "Spaghetti", quantity: 12 });
-      expect(saved?.userId).toBe(userId);
+      expect((await ctx.db.get(importId))?.generatedGroceryListId).toBe(
+        groceryListId,
+      );
     });
   });
 });
@@ -688,6 +713,174 @@ describe("recipe card validation branches", () => {
 });
 
 describe("grocery list validation branches", () => {
+  it("creates a renamed idempotent merged list and removes both originals", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "ListCombiner");
+    const otherId = await createUser(t, "OtherCombiner");
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const asOther = t.withIdentity({ subject: otherId });
+    const firstListId = await asOwner.mutation(api.groceryLists.create, {
+      name: "Dinner",
+    });
+    const secondListId = await asOwner.mutation(api.groceryLists.create, {
+      name: "Weekend",
+    });
+    await asOwner.mutation(api.groceryLists.addItem, {
+      listId: firstListId,
+      name: "Milk",
+      quantity: 2,
+      unit: "cups",
+    });
+    await asOwner.mutation(api.groceryLists.addItem, {
+      listId: secondListId,
+      name: "Milk",
+      quantityText: "3",
+      unit: "cups",
+    });
+    await asOwner.mutation(api.groceryLists.addItem, {
+      listId: secondListId,
+      name: "Bread",
+      quantity: 1,
+    });
+
+    await expect(
+      asOther.mutation(api.groceryLists.combineLists, {
+        listId: firstListId,
+        otherListId: secondListId,
+        requestId: "combine-other-user",
+        name: "Not yours",
+      }),
+    ).rejects.toThrow(/Forbidden/);
+    const requestId = "combine-dinner-weekend";
+    const combinedListId = await asOwner.mutation(
+      api.groceryLists.combineLists,
+      {
+        listId: firstListId,
+        otherListId: secondListId,
+        requestId,
+        name: "Weekly groceries",
+      },
+    );
+    expect(
+      await asOwner.mutation(api.groceryLists.combineLists, {
+        listId: firstListId,
+        otherListId: secondListId,
+        requestId,
+        name: "Weekly groceries",
+      }),
+    ).toBe(combinedListId);
+
+    expect(await asOwner.query(api.groceryLists.get, { listId: firstListId }))
+      .toBeNull();
+    expect(await asOwner.query(api.groceryLists.get, { listId: secondListId }))
+      .toBeNull();
+    const combined = await asOwner.query(api.groceryLists.get, {
+      listId: combinedListId,
+    });
+    expect(combined?.list.name).toBe("Weekly groceries");
+    expect(combined?.items).toHaveLength(2);
+    expect(combined?.items[0]).toMatchObject({
+      name: "Milk",
+      quantity: 5,
+      quantityText: "5",
+      unit: "cups",
+      isChecked: false,
+    });
+    expect(combined?.items[1]).toMatchObject({ name: "Bread", quantity: 1 });
+  });
+
+  it("atomically saves new and existing editable lists", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "ListSaver");
+    const otherId = await createUser(t, "OtherSaver");
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const asOther = t.withIdentity({ subject: otherId });
+    const requestId = "request-save-list-123";
+
+    const listId = await asOwner.mutation(api.groceryLists.save, {
+      requestId,
+      name: "Weekend trip",
+      items: [
+        {
+          name: "Milk",
+          quantityText: "2",
+          unit: "cups",
+          category: "Dairy",
+          notes: null,
+          isChecked: false,
+          sortOrder: 1,
+        },
+      ],
+    });
+    expect(
+      await asOwner.mutation(api.groceryLists.save, {
+        requestId,
+        name: "Weekend trip",
+        items: [],
+      }),
+    ).toBe(listId);
+
+    const firstItemId = await t.run(async (ctx) => {
+      const items = await ctx.db
+        .query("groceryListItems")
+        .withIndex("by_list", (q) => q.eq("listId", listId))
+        .collect();
+      expect(items).toHaveLength(1);
+      return items[0]._id;
+    });
+    await expect(
+      asOther.mutation(api.groceryLists.save, {
+        listId,
+        requestId: "request-other-user",
+        name: "Not yours",
+        items: [],
+      }),
+    ).rejects.toThrow(/Forbidden/);
+
+    await asOwner.mutation(api.groceryLists.save, {
+      listId,
+      requestId: "request-update-list",
+      name: "Updated weekend trip",
+      items: [
+        {
+          itemId: firstItemId,
+          name: "Oat milk",
+          quantityText: "3",
+          unit: "cartons",
+          category: "Dairy",
+          notes: null,
+          isChecked: true,
+          sortOrder: 1,
+        },
+        {
+          name: "Apples",
+          quantityText: "4",
+          unit: null,
+          category: "Produce",
+          notes: null,
+          isChecked: false,
+          sortOrder: 2,
+        },
+      ],
+    });
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(listId)).toMatchObject({
+        name: "Updated weekend trip",
+      });
+      const items = await ctx.db
+        .query("groceryListItems")
+        .withIndex("by_list_and_order", (q) => q.eq("listId", listId))
+        .collect();
+      expect(items).toHaveLength(2);
+      expect(items[0]).toMatchObject({
+        name: "Oat milk",
+        quantityText: "3",
+        isChecked: true,
+      });
+      expect(items[1]).toMatchObject({ name: "Apples" });
+    });
+  });
+
   it("covers anonymous access, nullable edits, item deletion, and validation", async () => {
     const t = initTest();
     const ownerId = await createUser(t, "ListEditor");

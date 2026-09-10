@@ -6,13 +6,13 @@
 - **Live app:** not deployed
 - **Repo:** private
 - **Frontend:** not deployed
-- **Convex deployment:** not deployed
+- **Convex deployment:** https://striped-meadowlark-868.convex.cloud (development)
 - **Components:** @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/agent, @convex-dev/workflow
 - **Convex features:** schema, tables, indexes, full-text search, queries, realtime queries, mutations, actions, HTTP actions, registered components
 - **Auth:** Convex Auth
-- **AI models:** openai/gpt-5-mini through Convex AI Gateway
+- **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-10T12:59:15Z
+- **Last updated:** 2026-09-10T21:24:32Z
 
 ## Log
 
@@ -84,3 +84,27 @@ for recipe fields, ingredients, notes, lists, and grocery items. Added backend
 coverage and documented unresolved frontend design decisions
 (`convex/recipeAgent.ts`, `convex/recipeAgentData.ts`, `convex/recipeCards.ts`,
 `convex/groceryLists.ts`, `FRONTEND_DESIGN_GAPS.md`).
+
+### 2026-09-10 - working tree
+Separated manual and recipe-backed grocery-list creation. New manual lists now
+open as empty editable lists, recipe processing no longer creates a list
+automatically, and **Create list** creates a recipe-named list on demand from
+the recipe's non-optional ingredients. Added authenticated, idempotent Convex
+creation and atomic save/update operations so manual and recipe-backed lists
+persist their names, additions, edits, checked state, and removals, then return
+the user to the All grocery lists page after a successful save. Added an
+overflow menu for list-only deletion and merging. Combining two owned lists
+consolidates matching ingredient units into a user-named replacement and removes
+both source lists atomically. The merge is idempotent, and the dialog starts
+with a required Choose a list prompt that is excluded from the selectable list
+options.
+Replaced the dashboard's mock saved-recipe cards with realtime Convex recipes so
+their grocery-list action is functional. Deployed the backend to the development
+deployment and verified list combination end to end in the local application.
+Switched recipe extraction to the server-side OpenAI provider so the free Convex
+deployment can use its deployment-scoped `OPENAI_API_KEY`; retained a documented
+provider switch for a future move to Convex AI Gateway. Added frontend and
+authenticated backend test coverage (`convex/groceryLists.ts`,
+`convex/recipeAgent.ts`, `convex/recipeAgentData.ts`, `components/grocery/`,
+`components/recipes/`, `app/(app)/app/grocery-lists/`,
+`app/(app)/app/page.tsx`).
