@@ -58,3 +58,20 @@ export function recipeLinksFromMessage(message: unknown) {
 export function optionalStringField(value: unknown, key: string) {
   return stringField(value, key);
 }
+
+export function senderFromMessage(message: unknown) {
+  if (typeof message !== "object" || message === null) return undefined;
+  const from = (message as Record<string, unknown>).from;
+  if (typeof from === "string") return from;
+  if (Array.isArray(from) && from.length === 1) {
+    const only = from[0];
+    if (typeof only === "string") return only;
+    if (typeof only === "object" && only !== null) {
+      return stringField(only, "email") ?? stringField(only, "address");
+    }
+  }
+  if (typeof from === "object" && from !== null) {
+    return stringField(from, "email") ?? stringField(from, "address");
+  }
+  return undefined;
+}

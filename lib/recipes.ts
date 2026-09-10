@@ -20,7 +20,8 @@ export function filterAndSortRecipes(
   if (sort === "recent") return [...filtered];
   return [...filtered].sort((a, b) =>
     sort === "quickest"
-      ? a.totalMinutes - b.totalMinutes
+      ? (a.totalMinutes > 0 ? a.totalMinutes : Number.POSITIVE_INFINITY) -
+        (b.totalMinutes > 0 ? b.totalMinutes : Number.POSITIVE_INFINITY)
       : a.title.localeCompare(b.title),
   );
 }

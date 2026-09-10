@@ -1,10 +1,11 @@
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { fetchQuery } from "convex/nextjs";
-import { ArrowLeft, Clock3, ExternalLink, ShoppingBasket, Users } from "lucide-react";
+import { ArrowLeft, Clock3, ExternalLink, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FoodArt } from "@/components/recipes/food-art";
 import { RecipeIngredients } from "@/components/recipes/recipe-ingredients";
+import { AddRecipeDialog } from "@/components/grocery/add-recipe-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
@@ -44,7 +45,7 @@ export default async function RecipeDetailPage({
             <span><Users className="inline" size={17} /> {servings} servings</span>
           </div>
           <div className="mt-7 cluster">
-            <Button asChild><Link href="/app/grocery-lists"><ShoppingBasket size={17} />Open grocery lists</Link></Button>
+            <AddRecipeDialog recipeId={recipe._id} title={recipe.title} ingredients={ingredients} initialServings={servings} />
             <Button asChild variant="secondary">
               <a href={recipe.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={17} />View original</a>
             </Button>

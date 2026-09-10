@@ -46,4 +46,11 @@ describe("filterAndSortRecipes", () => {
     ]);
     expect(fixtures.map((item) => item.id)).toEqual(["1", "2"]);
   });
+
+  it("places recipes with missing times after known quickest recipes", () => {
+    const untimed = { ...fixtures[0], id: "3", title: "Untimed", totalMinutes: 0 };
+    expect(
+      filterAndSortRecipes([untimed, ...fixtures], "", "quickest").map((item) => item.id),
+    ).toEqual(["2", "1", "3"]);
+  });
 });

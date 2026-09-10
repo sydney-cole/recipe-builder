@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
-import type { Doc, Id } from "./_generated/dataModel";
+import { accessibleRecipe } from "./lib/access";
 
 async function requireUser(ctx: QueryCtx) {
   const userId = await getAuthUserId(ctx);
@@ -15,58 +15,27 @@ export const list = query({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUser(ctx);
-    const [publicRecipes, imports, savedRecipes] = await Promise.all([
-      ctx.db
-        .query("recipes")
-        .withIndex("by_public", (q) => q.eq("isPublic", true))
-        .collect(),
-      ctx.db
-        .query("recipeImports")
-        .withIndex("by_requester", (q) => q.eq("requestedBy", userId))
-        .collect(),
-      ctx.db
+    const savedRecipes = await ctx.db
         .query("savedRecipes")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect(),
-    ]);
-
-    const recipeIds = new Set<Id<"recipes">>([
-      ...imports.flatMap((item) => (item.recipeId ? [item.recipeId] : [])),
-      ...savedRecipes.map((item) => item.recipeId),
-    ]);
-    const privateRecipes = await Promise.all(
-      [...recipeIds].map((recipeId) => ctx.db.get(recipeId)),
+        .collect();
+    const uniqueRelationships = new Map(
+      [...savedRecipes]
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .map((relationship) => [relationship.recipeId, relationship]),
     );
-    const recipesById = new Map<string, Doc<"recipes">>();
-    for (const recipe of [...publicRecipes, ...privateRecipes]) {
-      if (recipe !== null) recipesById.set(recipe._id, recipe);
-    }
-
-    return [...recipesById.values()].sort(
-      (a, b) => b._creationTime - a._creationTime,
-    );
+    return (
+      await Promise.all(
+        [...uniqueRelationships.values()].map(async (relationship) => ({
+          recipe: await ctx.db.get(relationship.recipeId),
+          savedAt: relationship.createdAt,
+        })),
+      )
+    ).flatMap(({ recipe, savedAt }) =>
+      recipe === null ? [] : [{ ...recipe, savedAt }],
+    ).sort((a, b) => b.savedAt - a.savedAt);
   },
 });
-
-async function canAccessRecipe(
-  ctx: QueryCtx,
-  userId: Id<"users">,
-  recipe: Doc<"recipes">,
-) {
-  if (recipe.isPublic === true) return true;
-
-  const saved = await ctx.db
-    .query("savedRecipes")
-    .withIndex("by_user_and_recipe", (q) =>
-      q.eq("userId", userId).eq("recipeId", recipe._id),
-    )
-    .first();
-  if (saved !== null) return true;
-
-  if (recipe.importId === undefined) return false;
-  const recipeImport = await ctx.db.get(recipe.importId);
-  return recipeImport?.requestedBy === userId;
-}
 
 export const get = query({
   args: { recipeId: v.string() },
@@ -77,13 +46,8 @@ export const get = query({
       return null;
     }
 
-    const recipe = await ctx.db.get(id);
-    if (recipe === null) {
-      return null;
-    }
-    if (!(await canAccessRecipe(ctx, userId, recipe))) {
-      return null;
-    }
+    const recipe = await accessibleRecipe(ctx, userId, id);
+    if (recipe === null) return null;
 
     const ingredients = await ctx.db
       .query("recipeIngredients")
@@ -91,5 +55,46 @@ export const get = query({
       .collect();
 
     return { recipe, ingredients };
+  },
+});
+
+export const summary = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    const [saved, imports] = await Promise.all([
+      ctx.db
+        .query("savedRecipes")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect(),
+      ctx.db
+        .query("recipeImports")
+        .withIndex("by_requester", (q) => q.eq("requestedBy", userId))
+        .collect(),
+    ]);
+    const recentRelationships = [...saved]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 3);
+    const recentRecipes = (
+      await Promise.all(
+        recentRelationships.map(async (relationship) => ({
+          relationship,
+          recipe: await ctx.db.get(relationship.recipeId),
+        })),
+      )
+    ).flatMap(({ relationship, recipe }) =>
+      recipe === null
+        ? []
+        : [{ recipe, savedAt: relationship.createdAt }],
+    );
+    return {
+      recipeCount: saved.length,
+      importCount: imports.length,
+      needsAttention: imports.filter((item) => item.status === "failed").length,
+      processingCount: imports.filter(
+        (item) => item.status === "queued" || item.status === "scraping",
+      ).length,
+      recentRecipes,
+    };
   },
 });

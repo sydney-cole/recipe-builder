@@ -34,6 +34,7 @@ export default function RecipeBookPage() {
       source: recipe.sourceSite ?? "Imported recipe",
       tags: recipe.categories.slice(0, 3),
       art: recipeArt(recipe.title),
+      createdAt: recipe.savedAt,
     }));
     return filterAndSortRecipes(mapped, search, sort);
   }, [convexRecipes, search, sort]);

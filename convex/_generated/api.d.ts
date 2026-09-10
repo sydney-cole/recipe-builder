@@ -10,9 +10,17 @@
 
 import type * as auth from "../auth.js";
 import type * as email from "../email.js";
+import type * as grocery from "../grocery.js";
 import type * as http from "../http.js";
+import type * as importProcessor from "../importProcessor.js";
+import type * as imports from "../imports.js";
+import type * as lib_access from "../lib/access.js";
 import type * as lib_agentmail from "../lib/agentmail.js";
+import type * as lib_importPipeline from "../lib/importPipeline.js";
 import type * as lib_urls from "../lib/urls.js";
+import type * as lib_validation from "../lib/validation.js";
+import type * as lib_verification from "../lib/verification.js";
+import type * as migrations from "../migrations.js";
 import type * as recipes from "../recipes.js";
 import type * as seed from "../seed.js";
 import type * as users from "../users.js";
@@ -26,9 +34,17 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   email: typeof email;
+  grocery: typeof grocery;
   http: typeof http;
+  importProcessor: typeof importProcessor;
+  imports: typeof imports;
+  "lib/access": typeof lib_access;
   "lib/agentmail": typeof lib_agentmail;
+  "lib/importPipeline": typeof lib_importPipeline;
   "lib/urls": typeof lib_urls;
+  "lib/validation": typeof lib_validation;
+  "lib/verification": typeof lib_verification;
+  migrations: typeof migrations;
   recipes: typeof recipes;
   seed: typeof seed;
   users: typeof users;

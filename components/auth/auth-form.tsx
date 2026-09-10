@@ -17,6 +17,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
   const isSignUp = mode === "sign-up";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -30,7 +32,14 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
     try {
       const result = await signIn("password", formData);
       if (!result.signingIn) {
-        throw new Error("Sign-in could not be completed. Please try again.");
+        const email = formData.get("email");
+        if (typeof email !== "string") {
+          throw new Error("Email verification could not be started.");
+        }
+        setVerificationEmail(email.trim().toLowerCase());
+        setVerificationCode("");
+        setIsSubmitting(false);
+        return;
       }
 
       router.replace(safeAppRedirect(searchParams.get("next")));
@@ -45,6 +54,25 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             ? "An account with this email already exists."
             : "We couldn’t complete that request. Please try again.",
       );
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (verificationEmail === null) return;
+    setError(null);
+    setIsSubmitting(true);
+    const formData = new FormData(event.currentTarget);
+    formData.set("flow", "email-verification");
+    formData.set("email", verificationEmail);
+    try {
+      const result = await signIn("password", formData);
+      if (!result.signingIn) throw new Error("Invalid or expired code");
+      router.replace(safeAppRedirect(searchParams.get("next")));
+      router.refresh();
+    } catch {
+      setError("That verification code is invalid or expired. Request a new code and try again.");
       setIsSubmitting(false);
     }
   }
@@ -74,10 +102,18 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
           <div className="mb-10 lg:hidden"><Brand /></div>
           <p className="eyebrow">Welcome {isSignUp ? "to PerfectPlate" : "back"}</p>
           <h2 className="font-display text-4xl font-semibold">
-            {isSignUp ? "Create your account" : "Sign in to your kitchen"}
+            {verificationEmail
+              ? "Verify your email"
+              : isSignUp
+                ? "Create your account"
+                : "Sign in to your kitchen"}
           </h2>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            {isSignUp ? "Save inspiration, simplify shopping, and keep dinner moving." : "Pick up where you left off."}
+            {verificationEmail
+              ? `Enter the six-digit code sent to ${verificationEmail}.`
+              : isSignUp
+                ? "Save inspiration, simplify shopping, and keep dinner moving."
+                : "Pick up where you left off."}
           </p>
 
           {error && (
@@ -87,7 +123,41 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             </Alert>
           )}
 
-          <form className="mt-8 grid gap-4" onSubmit={handleSubmit}>
+          {verificationEmail ? (
+            <form key="verification" className="mt-8 grid gap-4" onSubmit={handleVerification}>
+              <label className="grid gap-2 text-sm font-bold">
+                Verification code
+                <Input
+                  required
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  minLength={6}
+                  name="code"
+                  pattern="[0-9]{6}"
+                  placeholder="000000"
+                  value={verificationCode}
+                  onChange={(event) => setVerificationCode(event.target.value)}
+                />
+              </label>
+              <Button disabled={isSubmitting} type="submit" size="lg">
+                {isSubmitting ? "Verifying…" : "Verify email"}
+                {!isSubmitting && <ArrowRight size={17} />}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setVerificationEmail(null);
+                  setVerificationCode("");
+                  setError(null);
+                }}
+              >
+                Use a different email
+              </Button>
+            </form>
+          ) : (
+          <form key="credentials" className="mt-8 grid gap-4" onSubmit={handleSubmit}>
             {isSignUp && (
               <label className="grid gap-2 text-sm font-bold">
                 Name
@@ -113,6 +183,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
               {!isSubmitting && <ArrowRight size={17} />}
             </Button>
           </form>
+          )}
 
           <p className="mt-6 text-sm text-muted-foreground">
             {isSignUp ? "Already have an account?" : "New to PerfectPlate?"}{" "}

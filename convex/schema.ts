@@ -10,6 +10,22 @@ const importStatus = v.union(
   v.literal("failed"),
 );
 
+const importProcessingStage = v.union(
+  v.literal("retrieving"),
+  v.literal("generating"),
+);
+
+const importErrorCategory = v.union(
+  v.literal("invalid_source"),
+  v.literal("no_recipe"),
+  v.literal("provider_temporary"),
+  v.literal("rate_limited"),
+  v.literal("model_refusal"),
+  v.literal("incomplete_response"),
+  v.literal("invalid_output"),
+  v.literal("configuration"),
+);
+
 const groceryListStatus = v.union(
   v.literal("active"),
   v.literal("completed"),
@@ -36,8 +52,8 @@ export default defineSchema({
     .index("email", ["email"])
     .index("phone", ["phone"]),
 
-  // Maps each account to its AgentMail inbox. The AgentMail component keeps
-  // message and thread contents in its isolated component tables.
+  // Deprecated deployment bridge. The migration clears these obsolete
+  // per-user mappings; keeping the table temporarily permits a safe rollout.
   userInboxes: defineTable({
     userId: v.id("users"),
     inboxId: v.string(),
@@ -56,8 +72,11 @@ export default defineSchema({
     normalizedUrl: v.string(),
     status: importStatus,
     attemptCount: v.number(),
+    processingStage: v.optional(importProcessingStage),
     recipeId: v.optional(v.id("recipes")),
     errorMessage: v.optional(v.string()),
+    errorCategory: v.optional(importErrorCategory),
+    errorRetryable: v.optional(v.boolean()),
     sourceMessageId: v.optional(v.string()),
     sourceEventId: v.optional(v.string()),
     sourceSubject: v.optional(v.string()),
@@ -72,6 +91,72 @@ export default defineSchema({
     .index("by_requester_and_normalized_url", ["requestedBy", "normalizedUrl"])
     .index("by_source_event", ["sourceEventId"])
     .index("by_requester_and_status", ["requestedBy", "status"]),
+
+  // Idempotency and safe disposition tracking for the shared inbox. Message
+  // bodies and sender addresses remain in AgentMail's isolated component.
+  recipeInboxEvents: defineTable({
+    eventId: v.string(),
+    disposition: v.union(
+      v.literal("queued"),
+      v.literal("duplicate"),
+      v.literal("wrong_inbox"),
+      v.literal("unknown_sender"),
+      v.literal("no_links"),
+    ),
+    queuedCount: v.number(),
+    createdAt: v.number(),
+  }).index("by_event", ["eventId"]),
+
+  // Model output remains isolated from canonical recipes until its owner
+  // explicitly reviews and saves it.
+  recipeImportDrafts: defineTable({
+    importId: v.id("recipeImports"),
+    sourceUrl: v.string(),
+    sourceTitle: v.optional(v.string()),
+    sourceSite: v.optional(v.string()),
+    title: v.string(),
+    description: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    yieldText: v.optional(v.string()),
+    servings: v.optional(v.number()),
+    prepTimeMinutes: v.optional(v.number()),
+    cookTimeMinutes: v.optional(v.number()),
+    totalTimeMinutes: v.optional(v.number()),
+    cuisines: v.array(v.string()),
+    categories: v.array(v.string()),
+    keywords: v.array(v.string()),
+    ingredients: v.array(
+      v.object({
+        position: v.number(),
+        section: v.optional(v.string()),
+        originalText: v.string(),
+        name: v.string(),
+        normalizedName: v.string(),
+        quantity: v.optional(v.number()),
+        quantityText: v.optional(v.string()),
+        unit: v.optional(v.string()),
+        preparation: v.optional(v.string()),
+        notes: v.optional(v.string()),
+        isOptional: v.boolean(),
+      }),
+    ),
+    instructions: v.array(
+      v.object({
+        position: v.number(),
+        text: v.string(),
+        section: v.optional(v.string()),
+      }),
+    ),
+    modelId: v.string(),
+    promptVersion: v.string(),
+    schemaVersion: v.string(),
+    providerRequestId: v.optional(v.string()),
+    generatedAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_import", ["importId"])
+    .index("by_generated_at", ["generatedAt"]),
 
   // Canonical recipe content parsed from the source page. User-specific state
   // such as notes and favorites belongs in `savedRecipes` below.
@@ -198,6 +283,8 @@ export default defineSchema({
     notes: v.optional(v.string()),
     isChecked: v.boolean(),
     sortOrder: v.number(),
+    removedAt: v.optional(v.number()),
+    removalExpiresAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -205,6 +292,18 @@ export default defineSchema({
     .index("by_list_and_checked", ["listId", "isChecked"])
     .index("by_list_and_ingredient", ["listId", "ingredientId"])
     .index("by_list_and_order", ["listId", "sortOrder"]),
+
+  // A durable request key prevents a retried recipe-to-list confirmation from
+  // adding the same batch twice.
+  groceryListAdditions: defineTable({
+    listId: v.id("groceryLists"),
+    recipeId: v.id("recipes"),
+    requestKey: v.string(),
+    itemIds: v.array(v.id("groceryListItems")),
+    createdAt: v.number(),
+  })
+    .index("by_list", ["listId"])
+    .index("by_list_and_request", ["listId", "requestKey"]),
 
   groceryListItemSources: defineTable({
     groceryListItemId: v.id("groceryListItems"),

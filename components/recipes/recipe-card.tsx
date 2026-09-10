@@ -12,10 +12,12 @@ import type { Recipe } from "@/lib/data/types";
 export function RecipeCard({
   recipe,
   suggested = false,
+  preview = false,
   detailsHref = `/app/recipe-book/${recipe.id}`,
 }: {
   recipe: Recipe;
   suggested?: boolean;
+  preview?: boolean;
   detailsHref?: string | null;
 }) {
   const [saved, setSaved] = useState(!suggested);
@@ -35,12 +37,14 @@ export function RecipeCard({
         {recipe.matchReason && <p className="rounded-lg bg-primary-soft p-3 text-sm leading-5 text-primary"><strong>Why it fits:</strong> {recipe.matchReason}</p>}
         {recipe.missingIngredients && <p className="text-xs text-muted-foreground">Missing: {recipe.missingIngredients.join(", ")}</p>}
         <div className="cluster">{recipe.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {preview ? (
+          <Button variant="secondary" size="sm" disabled>Preview only</Button>
+        ) : <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Button variant={saved ? "secondary" : "default"} size="sm" onClick={() => setSaved(true)} disabled={saved}>
             {saved ? <BookCheck size={16} /> : <BookPlus size={16} />}{saved ? "In Recipe Book" : "Add to Recipe Book"}
           </Button>
           <Button asChild variant="secondary" size="sm"><Link href="/app/grocery-lists"><ShoppingBasket size={16} />Add to list</Link></Button>
-        </div>
+        </div>}
         <p className="text-xs text-muted-foreground">Source: {recipe.source}</p>
       </CardContent>
     </Card>
