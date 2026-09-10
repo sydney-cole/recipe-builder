@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through Convex AI Gateway
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-09T19:46:56Z
+- **Last updated:** 2026-09-10T12:59:15Z
 
 ## Log
 
@@ -75,7 +75,7 @@ artifacts for a future OpenAI agent, with retry, deduplication, stale-callback,
 and failure handling (`convex/recipeIngestion.ts`, `convex/schema.ts`,
 `convex/email.ts`, `convex/lib/recipeScrape.ts`).
 
-### 2026-09-09 - working tree
+### 2026-09-10 - 6fefda3
 Connected scraped recipe evidence to a persistent Convex Agent using an OpenAI
 model through the Convex AI Gateway. The durable workflow now creates a saved,
 editable recipe card and an independent grocery list, retains source
