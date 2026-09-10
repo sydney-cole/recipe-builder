@@ -85,7 +85,7 @@ coverage and documented unresolved frontend design decisions
 (`convex/recipeAgent.ts`, `convex/recipeAgentData.ts`, `convex/recipeCards.ts`,
 `convex/groceryLists.ts`, `FRONTEND_DESIGN_GAPS.md`).
 
-### 2026-09-10 - working tree
+### 2026-09-10 - 8b738a0
 Separated manual and recipe-backed grocery-list creation. New manual lists now
 open as empty editable lists, recipe processing no longer creates a list
 automatically, and **Create list** creates a recipe-named list on demand from
