@@ -99,6 +99,7 @@ export default defineSchema({
     normalizedUrl: v.string(),
     markdown: v.string(),
     recipeJsonLd: v.optional(v.string()),
+    imageSourceUrl: v.optional(v.string()),
     pageTitle: v.optional(v.string()),
     pageDescription: v.optional(v.string()),
     pageLanguage: v.optional(v.string()),
@@ -114,6 +115,33 @@ export default defineSchema({
     .index("by_import", ["importId"])
     .index("by_normalized_url", ["normalizedUrl"]),
 
+  // Shared Discover recommendations are refreshed at most once every 24 hours.
+  // Keeping the complete cards here prevents each page visit from scraping the
+  // web and invoking the ranking agent again.
+  recipeDiscoveryCache: defineTable({
+    key: v.string(),
+    query: v.string(),
+    recipes: v.array(
+      v.object({
+        url: v.string(),
+        title: v.string(),
+        description: v.string(),
+        source: v.string(),
+        rating: v.union(v.number(), v.null()),
+        ratingCount: v.union(v.number(), v.null()),
+        totalTimeMinutes: v.union(v.number(), v.null()),
+        matchReason: v.string(),
+        matchedTerms: v.array(v.string()),
+        ingredients: v.array(v.string()),
+        instructions: v.array(v.string()),
+      }),
+    ),
+    lastAttemptAt: v.number(),
+    refreshedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+
   // Canonical recipe content parsed from the source page. User-specific state
   // such as notes and favorites belongs in `savedRecipes` below.
   recipes: defineTable({
@@ -126,6 +154,7 @@ export default defineSchema({
     title: v.string(),
     description: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.id("_storage")),
     yieldText: v.optional(v.string()),
     servings: v.optional(v.number()),
     prepTimeMinutes: v.optional(v.number()),
@@ -160,6 +189,7 @@ export default defineSchema({
     .index("by_normalized_source_url", ["normalizedSourceUrl"])
     .index("by_public", ["isPublic"])
     .index("by_public_and_deleted_at", ["isPublic", "deletedAt"])
+    .index("by_image_storage_id_and_deleted_at", ["imageStorageId", "deletedAt"])
     .index("by_import", ["importId"])
     .searchIndex("search_recipes", {
       searchField: "title",

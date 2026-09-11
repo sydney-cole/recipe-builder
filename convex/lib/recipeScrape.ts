@@ -9,6 +9,7 @@ const textEncoder = new TextEncoder();
 export type RecipeScrapePayload = {
   markdown: string;
   recipeJsonLd?: string;
+  imageSourceUrl?: string;
   pageTitle?: string;
   pageDescription?: string;
   pageLanguage?: string;
@@ -18,6 +19,84 @@ export type RecipeScrapePayload = {
   firecrawlWarning?: string;
   truncated: boolean;
 };
+
+function findRecipeNode(value: unknown) {
+  const pending: unknown[] = [value];
+  const seen = new WeakSet<object>();
+  let visited = 0;
+
+  while (pending.length > 0 && visited < MAX_JSON_LD_NODES) {
+    const current = pending.pop();
+    visited += 1;
+    if (typeof current !== "object" || current === null) continue;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    const record = current as Record<string, unknown>;
+    const type = record["@type"];
+    if (type === "Recipe" || (Array.isArray(type) && type.includes("Recipe"))) {
+      return record;
+    }
+    for (const child of Object.values(record)) {
+      if (pending.length + visited >= MAX_JSON_LD_NODES) break;
+      if (typeof child === "object" && child !== null) pending.push(child);
+    }
+  }
+  return undefined;
+}
+
+function imageCandidate(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const candidate = imageCandidate(item);
+      if (candidate) return candidate;
+    }
+  }
+  if (typeof value === "object" && value !== null) {
+    const record = value as Record<string, unknown>;
+    return imageCandidate(record.url ?? record.contentUrl);
+  }
+  return undefined;
+}
+
+function normalizedImageUrl(value: unknown, baseUrl?: string) {
+  if (typeof value !== "string" || value.trim().length === 0) return undefined;
+  try {
+    const url = new URL(value.trim(), baseUrl);
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function extractRecipeImageUrl(
+  recipeJsonLd: string | undefined,
+  metadata: Record<string, unknown>,
+) {
+  const baseUrl = optionalBoundedString(metadata.sourceURL ?? metadata.url);
+  if (recipeJsonLd) {
+    try {
+      const recipe = findRecipeNode(JSON.parse(recipeJsonLd));
+      const recipeImage = normalizedImageUrl(
+        imageCandidate(recipe?.image),
+        baseUrl,
+      );
+      if (recipeImage) return recipeImage;
+    } catch {
+      // Malformed JSON-LD falls through to Firecrawl's page metadata.
+    }
+  }
+  return normalizedImageUrl(
+    metadata.ogImage ??
+      metadata["og:image"] ??
+      metadata.twitterImage ??
+      metadata["twitter:image"] ??
+      metadata.image,
+    baseUrl,
+  );
+}
 
 function boundedUtf8(value: string, maxBytes: number) {
   if (textEncoder.encode(value).byteLength <= maxBytes) {
@@ -122,6 +201,7 @@ export function buildRecipeScrapePayload(document: Record<string, unknown>) {
   };
 
   if (jsonLd) payload.recipeJsonLd = jsonLd.value;
+  payload.imageSourceUrl = extractRecipeImageUrl(jsonLd?.value, metadata);
   payload.pageTitle = optionalBoundedString(metadata.title);
   payload.pageDescription = optionalBoundedString(metadata.description);
   payload.pageLanguage = optionalBoundedString(metadata.language);

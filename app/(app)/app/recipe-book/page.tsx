@@ -34,6 +34,7 @@ export default function RecipeBookPage() {
       source: recipe.sourceSite ?? "Imported recipe",
       tags: recipe.categories.slice(0, 3),
       art: recipeArt(recipe.title),
+      imageUrl: recipe.imageUrl,
     }));
     return filterAndSortRecipes(mapped, search, sort);
   }, [convexRecipes, search, sort]);
@@ -44,7 +45,7 @@ export default function RecipeBookPage() {
         eyebrow="Your collection"
         title="Recipe Book"
         description="Every recipe you save or approve after import lives here."
-        actions={<Button asChild><Link href="/app/imports">Import recipe</Link></Button>}
+        actions={<Button asChild><Link href="/app/discover">Import recipe</Link></Button>}
       />
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <label className="relative flex-1">

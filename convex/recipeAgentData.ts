@@ -112,12 +112,13 @@ export const persistGeneratedRecipe = internalMutation({
     importId: v.id("recipeImports"),
     model: v.string(),
     extraction: recipeExtractionValidator,
+    imageStorageId: v.optional(v.id("_storage")),
   },
   returns: v.object({
     recipeId: v.id("recipes"),
     needsReview: v.boolean(),
   }),
-  handler: async (ctx, { importId, model, extraction }) => {
+  handler: async (ctx, { importId, model, extraction, imageStorageId }) => {
     const recipeImport = await ctx.db.get(importId);
     if (recipeImport === null) throw new Error("Recipe import was not found");
     if (recipeImport.requestedBy === undefined) {
@@ -150,6 +151,7 @@ export const persistGeneratedRecipe = internalMutation({
       sourceAuthor: optional(extraction.sourceAuthor),
       title: extraction.title.trim(),
       description: optional(extraction.description),
+      imageStorageId,
       yieldText: optional(extraction.yieldText),
       servings: optional(extraction.servings),
       prepTimeMinutes: optional(extraction.prepTimeMinutes),

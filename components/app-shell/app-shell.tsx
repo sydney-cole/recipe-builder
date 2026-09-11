@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { BookOpen, Compass, Home, Inbox, ListChecks, LogOut, Search, Settings, Sparkles } from "lucide-react";
+import { BookOpen, Compass, Home, Inbox, ListChecks, Settings } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,6 @@ const primary = [
   { href: "/app", label: "Home", icon: Home, exact: true },
   { href: "/app/discover", label: "Discover", icon: Compass },
   { href: "/app/recipe-book", label: "Recipe Book", icon: BookOpen },
-  { href: "/app/subscriptions", label: "Subscriptions", icon: Sparkles },
   { href: "/app/grocery-lists", label: "Grocery", icon: ListChecks },
 ];
 
@@ -56,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="nav-list">{primary.map((item) => <NavItem key={item.href} item={item} />)}</nav>
         <p className="sidebar-caption mt-6 px-3 text-xs font-bold uppercase tracking-[.12em] text-muted-foreground">Workspace</p>
         <nav className="nav-list mt-2">
-          <Link className="nav-link" href="/app/imports"><Inbox size={20} /><span className="nav-label">Email imports</span></Link>
+          <Link className="nav-link" href="/app/imports"><Inbox size={20} /><span className="nav-label">Inboxes</span></Link>
         </nav>
         <div className="sidebar-bottom nav-list">
           <Link className="nav-link" href="/app/settings"><Settings size={20} /><span className="nav-label">Settings</span></Link>
@@ -66,14 +65,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="app-frame">
         <header className="app-topbar">
           <span className="topbar-brand"><Brand compact /><span>PerfectPlate</span></span>
-          <Link className="global-search" href="/app/recipe-book" aria-label="Search recipes">
-            <Search size={17} /><span>Search your Recipe Book</span>
-          </Link>
-          <Button asChild variant="accent" className="hidden sm:inline-flex"><Link href="/app/imports"><Inbox size={17} />Email recipe</Link></Button>
-          <Button variant="secondary" size="icon" aria-label="Sign out" title="Sign out" disabled={isSigningOut} onClick={handleSignOut}>
-            <LogOut size={18} />
-          </Button>
-          {signOutError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t sign out. Try again.</p>}
+          <div className="topbar-actions">
+            {signOutError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t sign out. Try again.</p>}
+            <Button asChild variant="accent" className="hidden sm:inline-flex"><Link href="/app/imports"><Inbox size={17} />Inboxes</Link></Button>
+            <Button variant="secondary" disabled={isSigningOut} onClick={handleSignOut}>
+              {isSigningOut ? "Logging out…" : "Log out"}
+            </Button>
+          </div>
         </header>
         <main id="main-content" className="app-main">{children}</main>
       </div>

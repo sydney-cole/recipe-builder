@@ -25,9 +25,9 @@ export function RecipeCard({
   return (
     <Card className="recipe-card">
       {detailsHref ? (
-        <Link href={detailsHref} aria-label={`View ${recipe.title}`}><FoodArt variant={recipe.art} label={recipe.tags[0]} /></Link>
+        <Link href={detailsHref} aria-label={`View ${recipe.title}`}><FoodArt variant={recipe.art} label={recipe.tags[0]} imageUrl={recipe.imageUrl} /></Link>
       ) : (
-        <FoodArt variant={recipe.art} label={recipe.tags[0]} />
+        <FoodArt variant={recipe.art} label={recipe.tags[0]} imageUrl={recipe.imageUrl} />
       )}
       <CardContent className="stack">
         <div>

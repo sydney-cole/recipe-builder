@@ -34,6 +34,7 @@ export const recipeIngestionWorkflow = new WorkflowManager(
 const scrapeResult = v.object({
   markdown: v.string(),
   recipeJsonLd: v.optional(v.string()),
+  imageSourceUrl: v.optional(v.string()),
   pageTitle: v.optional(v.string()),
   pageDescription: v.optional(v.string()),
   pageLanguage: v.optional(v.string()),
@@ -176,6 +177,11 @@ export const ingestRecipeSource = recipeIngestionWorkflow.define({
       importId,
       scrape,
     });
+    const imageStorageId = scrape.imageSourceUrl
+      ? await step.runAction(internal.recipeImages.storeFromUrl, {
+          url: scrape.imageSourceUrl,
+        })
+      : null;
     const processing = await step.runMutation(
       internal.recipeAgentData.ensureProcessingThread,
       { importId },
@@ -187,7 +193,12 @@ export const ingestRecipeSource = recipeIngestionWorkflow.define({
     });
     const persisted = await step.runMutation(
       internal.recipeAgentData.persistGeneratedRecipe,
-      { importId, model: generated.model, extraction: generated.extraction },
+      {
+        importId,
+        model: generated.model,
+        extraction: generated.extraction,
+        ...(imageStorageId === null ? {} : { imageStorageId }),
+      },
     );
     return persisted.recipeId;
   },
@@ -339,6 +350,7 @@ export const agentReadyArtifact = internalQuery({
       sourceQuery: v.optional(v.string()),
       markdown: v.string(),
       recipeJsonLd: v.optional(v.string()),
+      imageSourceUrl: v.optional(v.string()),
       pageTitle: v.optional(v.string()),
       pageDescription: v.optional(v.string()),
       pageLanguage: v.optional(v.string()),
@@ -368,6 +380,7 @@ export const agentReadyArtifact = internalQuery({
       sourceQuery: recipeImport.sourceQuery,
       markdown: artifact.markdown,
       recipeJsonLd: artifact.recipeJsonLd,
+      imageSourceUrl: artifact.imageSourceUrl,
       pageTitle: artifact.pageTitle,
       pageDescription: artifact.pageDescription,
       pageLanguage: artifact.pageLanguage,

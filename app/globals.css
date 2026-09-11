@@ -68,6 +68,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .button-destructive { background: #fbe8e8; color: var(--danger); }
 
 .input { min-height: 44px; width: 100%; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface); color: var(--foreground); padding: .65rem .8rem; box-shadow: 0 1px 2px rgb(28 35 27 / .04); }
+.input.discovery-search-input { padding-left: 2.75rem; }
 .input::placeholder { color: #8a9388; }
 .input:focus { border-color: var(--focus); outline: none; box-shadow: 0 0 0 3px rgb(37 99 235 / .18); }
 .checkbox { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border: 1.5px solid #a8b2a5; border-radius: 6px; background: white; color: white; }
@@ -93,15 +94,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .sidebar-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 1rem; }
 .app-topbar { position: sticky; top: 0; z-index: 30; display: flex; height: 64px; align-items: center; gap: .75rem; border-bottom: 1px solid rgb(221 228 216 / .85); background: rgb(251 250 246 / .88); padding: 0 1rem; backdrop-filter: blur(16px); }
 .topbar-brand { margin-right: auto; display: flex; align-items: center; gap: .55rem; font-weight: 800; }
-.global-search { display: none; max-width: 520px; flex: 1; align-items: center; gap: .6rem; border: 1px solid var(--border); border-radius: .6rem; background: white; color: var(--muted-foreground); padding: .58rem .75rem; font-size: .875rem; }
-.keycap { margin-left: auto; border: 1px solid var(--border); border-radius: 5px; background: var(--surface-subtle); padding: .08rem .35rem; font-size: .7rem; }
+.topbar-actions { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: .75rem; }
 .app-main { min-width: 0; padding-bottom: 88px; }
 .page-container { width: 100%; max-width: 1440px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 .page-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
 .eyebrow { margin-bottom: .35rem; color: var(--primary); font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .page-title { margin: 0; font-size: clamp(1.75rem, 3vw, 2rem); font-weight: 800; line-height: 1.2; letter-spacing: -.035em; }
 .page-description { max-width: 680px; margin: .45rem 0 0; color: var(--muted-foreground); line-height: 1.55; }
-.mobile-nav { position: fixed; inset: auto 0 0; z-index: 45; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); background: rgb(255 255 255 / .96); padding: .4rem max(.3rem, env(safe-area-inset-right)) max(.4rem, env(safe-area-inset-bottom)) max(.3rem, env(safe-area-inset-left)); backdrop-filter: blur(16px); }
+.mobile-nav { position: fixed; inset: auto 0 0; z-index: 45; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--border); background: rgb(255 255 255 / .96); padding: .4rem max(.3rem, env(safe-area-inset-right)) max(.4rem, env(safe-area-inset-bottom)) max(.3rem, env(safe-area-inset-left)); backdrop-filter: blur(16px); }
 .mobile-nav .nav-link { min-width: 0; flex-direction: column; gap: .1rem; padding: .35rem .15rem; font-size: .65rem; }
 .mobile-nav .nav-link.active::before { inset: -7px auto auto; width: 26px; height: 3px; }
 
@@ -110,12 +110,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .section-copy { margin: .3rem 0 0; color: var(--muted-foreground); font-size: .9rem; }
 .section-row { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .stack { display: grid; gap: 1rem; }
+.stack.discovery-sections { gap: 0; }
+.known-recipe-heading { margin-top: clamp(3rem, 5vw, 4.5rem); margin-bottom: 1.5rem; }
+.discovery-recommendations { margin-top: clamp(3.5rem, 6vw, 5rem); }
 .cluster { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
 
 .food-art { position: relative; min-height: 180px; overflow: hidden; isolation: isolate; }
 .food-art::before, .food-art::after { position: absolute; border-radius: 999px; content: ""; filter: blur(1px); }
 .food-art::before { width: 190px; height: 190px; right: -30px; top: -45px; background: rgb(255 255 255 / .38); }
 .food-art::after { width: 120px; height: 120px; left: 20px; bottom: -50px; background: rgb(255 255 255 / .3); }
+.food-art-image { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; object-fit: cover; }
 .food-art.garden { background: radial-gradient(circle at 35% 40%, #9bc17c 0 12%, transparent 13%), radial-gradient(circle at 56% 62%, #d8e7a8 0 15%, transparent 16%), linear-gradient(135deg, #315f3a, #81a96c); }
 .food-art.citrus { background: radial-gradient(circle at 35% 45%, #ffe17a 0 16%, #f2a73a 17% 22%, transparent 23%), radial-gradient(circle at 65% 60%, #f5f0ce 0 18%, transparent 19%), linear-gradient(135deg, #eb8b3e, #f6c85f); }
 .food-art.tomato { background: radial-gradient(circle at 35% 48%, #dd674f 0 18%, transparent 19%), radial-gradient(circle at 64% 58%, #f4b09d 0 14%, transparent 15%), linear-gradient(135deg, #873e31, #dd8068); }
@@ -146,6 +150,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .quick-action strong, .quick-action small { display: block; }
 .quick-action small { margin-top: .2rem; color: var(--muted-foreground); }
 .search-workbench { border: 1px solid var(--border); border-radius: 1rem; background: linear-gradient(135deg, #fff, var(--surface-subtle)); padding: clamp(1.25rem, 4vw, 2.5rem); box-shadow: 0 16px 42px rgb(28 35 27 / .07); }
+.card.discovery-import-card { background: linear-gradient(135deg, #fff, var(--surface-subtle)); }
+.card-content.discovery-import-content { padding: clamp(1.25rem, 4vw, 2.5rem); }
 .filter-chip { display: inline-flex; min-height: 34px; align-items: center; gap: .35rem; border: 1px solid #b9cbb5; border-radius: 999px; background: var(--primary-soft); color: var(--primary); padding: .35rem .7rem; font-size: .78rem; font-weight: 750; }
 .import-hero { background: linear-gradient(145deg, #fff 30%, var(--accent-soft)); }
 .grocery-row { display: grid; grid-template-columns: auto minmax(0, 1fr) 68px 82px auto; align-items: center; gap: .65rem; padding: .8rem 1rem; }
@@ -172,7 +178,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .nav-link { justify-content: center; padding-inline: .5rem; }
   .app-frame { padding-left: 72px; }
   .topbar-brand { display: none; }
-  .global-search { display: flex; }
   .mobile-nav { display: none; }
   .app-main { padding-bottom: 0; }
   .page-container { padding: 2rem 1.5rem 4rem; }

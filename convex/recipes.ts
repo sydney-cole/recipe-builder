@@ -91,6 +91,17 @@ async function requireUser(ctx: QueryCtx) {
   return userId;
 }
 
+async function recipeView(ctx: QueryCtx, recipe: Doc<"recipes">) {
+  const { imageStorageId, ...visibleRecipe } = recipe;
+  const storedImageUrl = imageStorageId
+    ? await ctx.storage.getUrl(imageStorageId)
+    : null;
+  return {
+    ...visibleRecipe,
+    imageUrl: storedImageUrl ?? recipe.imageUrl,
+  };
+}
+
 export const list = query({
   args: {},
   returns: v.array(recipeValidator),
@@ -127,8 +138,11 @@ export const list = query({
       }
     }
 
-    return [...recipesById.values()].sort(
+    const sortedRecipes = [...recipesById.values()].sort(
       (a, b) => b._creationTime - a._creationTime,
+    );
+    return await Promise.all(
+      sortedRecipes.map((recipe) => recipeView(ctx, recipe)),
     );
   },
 });
@@ -210,7 +224,7 @@ export const get = query({
         : null;
 
     return {
-      recipe,
+      recipe: await recipeView(ctx, recipe),
       ingredients,
       saved:
         savedRecipe === null

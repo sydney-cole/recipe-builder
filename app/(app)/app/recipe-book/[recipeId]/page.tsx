@@ -35,7 +35,7 @@ export default async function RecipeDetailPage({
         <Link href="/app/recipe-book"><ArrowLeft size={17} />Back to Recipe Book</Link>
       </Button>
       <div className="recipe-detail-hero">
-        <FoodArt variant={recipeArt(recipe.title)} label={tags[0] ?? "Recipe"} />
+        <FoodArt variant={recipeArt(recipe.title)} label={tags[0] ?? "Recipe"} imageUrl={recipe.imageUrl} />
         <div className="p-6 sm:p-8">
           <div className="cluster">{tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
           <h1 className="mt-4 font-display text-4xl font-semibold leading-tight sm:text-5xl">{recipe.title}</h1>

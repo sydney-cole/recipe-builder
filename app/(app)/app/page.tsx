@@ -7,7 +7,6 @@ import {
   Inbox,
   ListChecks,
   Search,
-  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app-shell/page-header";
@@ -29,8 +28,8 @@ const quickActions = [
   {
     href: "/app/imports",
     icon: Inbox,
-    label: "Import by email",
-    detail: "Forward a recipe link",
+    label: "Inboxes",
+    detail: "Connect your recipe inbox",
   },
   {
     href: "/app/grocery-lists",
@@ -55,6 +54,7 @@ export default function DashboardPage() {
       source: recipe.sourceSite ?? "Imported recipe",
       tags: recipe.categories.slice(0, 3),
       art: recipeArt(recipe.title),
+      imageUrl: recipe.imageUrl,
     }),
   );
 
@@ -64,14 +64,6 @@ export default function DashboardPage() {
         eyebrow="Good afternoon"
         title="What are we cooking?"
         description="Your kitchen command center for saved recipes and grocery planning."
-        actions={
-          <Button asChild>
-            <Link href="/app/discover">
-              <Sparkles size={17} />
-              Discover dinner
-            </Link>
-          </Button>
-        }
       />
       <section
         className="grid gap-4 md:grid-cols-3"
@@ -118,7 +110,7 @@ export default function DashboardPage() {
               <BookOpen className="mx-auto text-muted-foreground" />
               <p className="mt-3 font-extrabold">No saved recipes yet</p>
               <Button asChild className="mt-4" size="sm">
-                <Link href="/app/imports">Import a recipe</Link>
+                <Link href="/app/discover">Import a recipe</Link>
               </Button>
             </CardContent>
           </Card>

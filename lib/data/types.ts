@@ -7,6 +7,7 @@ export type Recipe = {
   source: string;
   tags: string[];
   art: "garden" | "citrus" | "tomato" | "berry";
+  imageUrl?: string;
   matchReason?: string;
   missingIngredients?: string[];
 };

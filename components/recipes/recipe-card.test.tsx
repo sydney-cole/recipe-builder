@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { RecipeCard } from "./recipe-card";
@@ -33,5 +33,24 @@ describe("RecipeCard", () => {
     const save = screen.getByRole("button", { name: "Add to Recipe Book" });
     await user.click(save);
     expect(screen.getByRole("button", { name: "In Recipe Book" })).toBeDisabled();
+  });
+
+  it("shows a stored meal image and falls back to the default art if it fails", () => {
+    const { container } = render(
+      <RecipeCard
+        recipe={{ ...recipe, imageUrl: "https://storage.example.com/orzo.jpg" }}
+      />,
+    );
+    const image = container.querySelector(".food-art-image");
+    expect(image).toHaveAttribute(
+      "src",
+      "https://storage.example.com/orzo.jpg",
+    );
+    fireEvent.error(image as HTMLImageElement);
+    expect(container.querySelector(".food-art-image")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Dinner" })).toHaveClass(
+      "food-art",
+      "garden",
+    );
   });
 });

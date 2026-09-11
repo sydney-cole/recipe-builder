@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRecipeScrapePayload,
+  extractRecipeImageUrl,
   extractRecipeJsonLd,
 } from "./recipeScrape";
 
@@ -12,6 +13,7 @@ describe("recipe scrape artifact preparation", () => {
         "@context": "https://schema.org",
         "@type": "Recipe",
         name: "Lentil stew",
+        image: { url: "https://cdn.example.com/lentil-stew.jpg" },
       })}</script>`,
       metadata: {
         title: "Lentil stew",
@@ -25,11 +27,21 @@ describe("recipe scrape artifact preparation", () => {
       canonicalUrl: "https://example.com/stew",
       statusCode: 200,
       truncated: false,
+      imageSourceUrl: "https://cdn.example.com/lentil-stew.jpg",
     });
     expect(JSON.parse(result.recipeJsonLd ?? "{}")).toMatchObject({
       "@type": "Recipe",
       name: "Lentil stew",
     });
+  });
+
+  it("falls back to Firecrawl's Open Graph image and resolves relative URLs", () => {
+    expect(
+      extractRecipeImageUrl(undefined, {
+        sourceURL: "https://example.com/recipes/stew",
+        ogImage: "/images/stew.webp",
+      }),
+    ).toBe("https://example.com/images/stew.webp");
   });
 
   it("ignores malformed and non-recipe JSON-LD", () => {

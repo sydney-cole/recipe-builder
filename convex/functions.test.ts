@@ -54,6 +54,44 @@ async function createRecipe(
   });
 }
 
+describe("daily recipe recommendations", () => {
+  it("allows one refresh and reuses the saved recommendations for the day", async () => {
+    const t = initTest();
+    const firstClaim = await t.mutation(
+      internal.recipeDiscoveryCache.claimDailyRefresh,
+      {},
+    );
+    expect(firstClaim).toEqual({ shouldRefresh: true, cached: null });
+
+    const recipe = {
+      url: "https://example.com/daily-recipe",
+      title: "Daily recipe",
+      description: "A cached recommendation.",
+      source: "example.com",
+      rating: 4.9,
+      ratingCount: 100,
+      totalTimeMinutes: 30,
+      matchReason: "Highly rated and complete.",
+      matchedTerms: [],
+      ingredients: ["1 ingredient"],
+      instructions: ["Cook it."],
+    };
+    await t.mutation(
+      internal.recipeDiscoveryCache.saveDailyRecommendations,
+      { query: "best rated recipes", recipes: [recipe] },
+    );
+
+    const secondClaim = await t.mutation(
+      internal.recipeDiscoveryCache.claimDailyRefresh,
+      {},
+    );
+    expect(secondClaim).toEqual({
+      shouldRefresh: false,
+      cached: { query: "best rated recipes", recipes: [recipe] },
+    });
+  });
+});
+
 describe("email functions", () => {
   it("requires authentication and deduplicates normalized URL submissions", async () => {
     const t = initTest();

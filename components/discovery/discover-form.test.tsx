@@ -3,10 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DiscoverForm } from "./discover-form";
 
-const mocks = vi.hoisted(() => ({ search: vi.fn(), queue: vi.fn(), push: vi.fn() }));
+const mocks = vi.hoisted(() => ({ search: vi.fn(), queue: vi.fn() }));
 
 vi.mock("convex/react", () => ({ useAction: () => mocks.search, useMutation: () => mocks.queue }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
 
 const result = {
   url: "https://example.com/lemon-chicken",
@@ -18,6 +17,8 @@ const result = {
   totalTimeMinutes: 35,
   matchReason: "Matches chicken and lemon.",
   matchedTerms: ["chicken", "lemon"],
+  ingredients: ["1 pound chicken thighs", "1 lemon"],
+  instructions: ["Season the chicken.", "Cook until golden and finish with lemon."],
 };
 
 describe("DiscoverForm", () => {
@@ -32,7 +33,39 @@ describe("DiscoverForm", () => {
     render(<DiscoverForm />);
     await user.click(screen.getByRole("button", { name: "Find recipes" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Add at least one");
-    expect(mocks.search).not.toHaveBeenCalled();
+    expect(mocks.search).toHaveBeenCalledWith({ terms: [], mode: "recommended" });
+    expect(mocks.search).not.toHaveBeenCalledWith({ terms: [], mode: "search" });
+    expect(screen.getByRole("heading", { name: "Recommended recipes" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Already have a recipe in mind?" })).toHaveClass("page-title");
+    expect(screen.getByText(/create an editable recipe card/)).toBeInTheDocument();
+  });
+
+  it("loads web recommendations automatically and opens complete recipe details", async () => {
+    const user = userEvent.setup();
+    render(<DiscoverForm />);
+
+    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith({ terms: [], mode: "recommended" }));
+    await user.click(await screen.findByRole("button", { name: "View recipe" }));
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("1 pound chicken thighs");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Cook until golden and finish with lemon.");
+    expect(screen.getByRole("button", { name: "Add to Recipe Book" })).toBeInTheDocument();
+  });
+
+  it("explains that live recommendations are loading", () => {
+    mocks.search.mockImplementation(() => new Promise(() => undefined));
+    render(<DiscoverForm />);
+    expect(screen.getByRole("status")).toHaveTextContent("Searching the web and loading complete recipe details");
+  });
+
+  it("adds clear spacing between the major discovery sections", async () => {
+    const { container } = render(<DiscoverForm />);
+    await screen.findByRole("button", { name: "View recipe" });
+    expect(container.firstElementChild).toHaveClass("discovery-sections");
+    expect(screen.getByRole("heading", { name: "Already have a recipe in mind?" }).parentElement).toHaveClass("known-recipe-heading");
+    expect(screen.getByRole("heading", { name: "Recommended recipes" }).closest("section")).toHaveClass("discovery-recommendations");
+    expect(screen.getByRole("button", { name: "Find recipes" })).toHaveClass("button-lg", "w-full");
+    expect(screen.getByRole("button", { name: "Import recipe" })).toHaveClass("button-lg", "w-full");
   });
 
   it("searches with one or more normalized constraints", async () => {
@@ -41,7 +74,7 @@ describe("DiscoverForm", () => {
     const input = screen.getByPlaceholderText(/chicken, broccoli/);
     await user.type(input, "Chicken, Lemon");
     await user.click(screen.getByRole("button", { name: "Find recipes" }));
-    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith({ terms: ["chicken", "lemon"] }));
+    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith({ terms: ["chicken", "lemon"], mode: "search" }));
     expect(await screen.findByText("Lemon chicken")).toBeInTheDocument();
     expect(screen.getByText("4.8 (210)")).toBeInTheDocument();
   });
@@ -74,6 +107,7 @@ describe("DiscoverForm", () => {
 
     await waitFor(() => expect(mocks.search).toHaveBeenCalledWith({
       terms: ["broccoli", "cozy", "30-minute dinner", "italian", "spicy", "pasta"],
+      mode: "search",
     }));
     expect(screen.queryByRole("button", { name: "Remove chicken thighs" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(6);
@@ -84,8 +118,9 @@ describe("DiscoverForm", () => {
     render(<DiscoverForm />);
     await user.click(screen.getByRole("button", { name: "chicken thighs" }));
     await user.click(screen.getByRole("button", { name: "Find recipes" }));
-    await user.click(await screen.findByRole("button", { name: "Choose this recipe" }));
+    await user.click(await screen.findByRole("button", { name: "View recipe" }));
+    await user.click(screen.getByRole("button", { name: "Add to Recipe Book" }));
     expect(mocks.queue).toHaveBeenCalledWith({ sourceUrl: result.url, sourceQuery: "chicken thighs" });
-    expect(mocks.push).toHaveBeenCalledWith("/app/imports");
+    expect(await screen.findByRole("status")).toHaveTextContent("Lemon chicken is queued");
   });
 });
