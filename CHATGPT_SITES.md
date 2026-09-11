@@ -10,11 +10,25 @@ version should contain. Untracked files are not a reliable deployment input.
 
 ## 1. Prepare the production backend
 
-Only deploy the Convex backend after the working tree passes the project checks:
+Install from the lockfile and verify both the application and Worker builds:
 
 ```sh
+npm ci
 npm run check
 npm run build
+npm run build:worker
+npx wrangler deploy --dry-run
+```
+
+The Worker build uses the pinned OpenNext and Wrangler versions in
+`package.json`. Its generated `.open-next/worker.js` entrypoint and
+`.open-next/assets` directory are local build output and must not be committed.
+OpenNext's support for the Next.js 16 Node.js `proxy.ts` runtime is experimental,
+so validate authentication again on every saved Sites version.
+
+Only deploy the Convex backend after those checks pass:
+
+```sh
 npx convex deploy
 ```
 
@@ -70,11 +84,15 @@ review the proposal rather than accepting it automatically.
 
 ## 3. Configure Sites environment values
 
-In **Sites > PerfectPlate > More actions > Settings**, add the production
-values for:
+In **Sites > PerfectPlate > More actions > Settings**, add the confirmed
+production value for:
 
 - `NEXT_PUBLIC_CONVEX_URL`
-- `CONVEX_SITE_URL`
+
+This public URL is compiled into the browser bundle, so rebuild the Site after
+changing it. Supply `CONVEX_SITE_URL` to the Sites server runtime only if the
+saved build reports that it is required there; its authoritative use is in the
+hosted Convex Auth configuration.
 
 Keep OpenAI, Firecrawl, and AgentMail secrets exclusively in the Convex
 deployment environment. Do not copy them into a prompt or commit them.

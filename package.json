@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
+    "build:worker": "opennextjs-cloudflare build",
+    "preview:worker": "opennextjs-cloudflare preview",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -52,6 +54,7 @@
     "zod": "^4.6.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.3",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
@@ -66,6 +69,7 @@
     "jsdom": "^26.1.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "wrangler": "4.125.0"
   }
 }
