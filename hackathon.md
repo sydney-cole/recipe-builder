@@ -8,11 +8,11 @@
 - **Frontend:** not deployed
 - **Convex deployment:** https://striped-meadowlark-868.convex.cloud (development)
 - **Components:** @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/agent, @convex-dev/workflow
-- **Convex features:** schema, tables, indexes, full-text search, queries, realtime queries, mutations, actions, HTTP actions, registered components
+- **Convex features:** schema, tables, indexes, full-text search, queries, realtime queries, mutations, actions, HTTP actions, file storage, registered components
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-11T18:46:48Z
+- **Last updated:** 2026-09-11T20:24:13Z
 
 ## Log
 
@@ -109,7 +109,7 @@ authenticated backend test coverage (`convex/groceryLists.ts`,
 `components/recipes/`, `app/(app)/app/grocery-lists/`,
 `app/(app)/app/page.tsx`).
 
-### 2026-09-11 - working tree
+### 2026-09-11 - 94f9063
 Replaced mock Discover recommendations with an authenticated Convex action that
 accepts one or more ingredient, flavor, cuisine, or dish constraints. Firecrawl
 searches and extracts evidence from up to eight live recipe pages, then the
@@ -125,3 +125,76 @@ controls. The six-chip limit evicts the oldest constraint when a newer one is
 added. The new functions are on the development deployment; live ranking
 verification is pending successful configuration of the deployment-scoped
 OpenAI API key.
+
+### 2026-09-11 - 45fdecb
+Consolidated manual recipe intake on Discover: users can now either ask the
+agent to find recipes or paste a known recipe URL on the same page, and both
+choices enter the existing durable Firecrawl import pipeline. Renamed the
+email destination to Inboxes and reduced it to AgentMail inbox connection and
+address access; removed the recent-import feed and moved every manual-import
+link to Discover. Successful queues now explain that the resulting card will
+appear in the Recipe Book instead of redirecting to inbox setup. Added focused
+interaction and page-scope tests (`components/discovery/recipe-link-import.tsx`,
+`components/discovery/discover-form.tsx`, `components/imports/email-intake.tsx`,
+`components/app-shell/app-shell.tsx`). Refined the Discover results area as
+Recommended recipes, describing its evidence-ranked three-result maximum, and
+fixed the search input spacing so its text clears the search icon. Added a
+clear transition into known-link importing that explains the editable recipe
+card and grocery-list workflow while matching the primary page-header styling.
+Increased the spacing between Discover sections to keep each heading visually
+distinct. Aligned the discovery and known-link forms to the same responsive
+input and primary-action grid, including matching panel insets, button size,
+and placement. Increased the shared spacing between each major section and
+shortened the known-link form heading to Paste a recipe link. Added a dedicated
+responsive section-gap rule so the larger spacing is not overridden by the
+shared stack layout. Matched the Paste a recipe link title typography to the
+primary discovery prompt. Refined section-specific spacing so the known-recipe
+heading uses the same prompt-to-input rhythm as discovery while retaining clear
+separation from the preceding search panel and recommendations. Matched the
+known-link panel background to the discovery search panel.
+
+The Recommended recipes section now loads automatically from a live Firecrawl
+search for highly rated recipe pages. The persistent OpenAI-powered Convex
+Agent ranks no more than three results and returns evidence-grounded ingredient
+lines and ordered instructions before rendering. Users can open a recommendation
+in an accessible detail dialog, review the complete recipe and source, and then
+queue it into the existing Recipe Book import workflow. Verified on the
+development deployment with two live recommendations; one opened with nine
+ingredients and seven instruction steps (`convex/recipeDiscovery.ts`,
+`components/discovery/discover-form.tsx`). Added an explicit live-search status
+instead of showing unlabeled skeletons alone. Kept the broader eight-page
+evidence pool after a three-candidate trial returned no complete recipes; the
+user-visible result remains capped at three. Removed a brittle numeric-rating
+cutoff that hid complete recipes when publishers did not expose machine-readable
+ratings; the best-rated search query and evidence-based agent ranking remain.
+Added a structured Firecrawl fallback for cases where the agent omits otherwise
+complete extracted recipes, ranking those candidates by available rating,
+review-count, and search-position evidence. Re-deployed and verified the live
+Discover page renders three recommendations; opening the first displayed both
+ingredients and ordered instructions.
+Cached the shared Recommended recipes payload in Convex with an atomic daily
+refresh claim, so page visits reuse the stored complete cards and at most one
+web scrape and agent-ranking attempt occurs in each 24-hour window. Concurrent
+visits wait for the claimed refresh instead of duplicating it. Deployed the
+cache table and internal functions, then verified an initial live refresh and a
+second three-card response from cache in under one second
+(`convex/recipeDiscoveryCache.ts`, `convex/recipeDiscovery.ts`,
+`convex/schema.ts`).
+
+Added meal-image ingestion to the durable recipe workflow. Firecrawl recipe
+JSON-LD is preferred, with page metadata as a fallback; accepted raster images
+are size- and type-bounded before being copied into Convex file storage. Recipe
+queries resolve the current storage URL, and cards and details fall back to the
+existing abstract food art when an image is missing or fails to load. Added a
+bounded internal backfill for existing recipes and verified stored images on the
+development deployment (`convex/lib/recipeScrape.ts`, `convex/recipeImages.ts`,
+`convex/recipeImagesData.ts`, `convex/recipeIngestion.ts`, `convex/recipes.ts`,
+`components/recipes/food-art.tsx`).
+
+Simplified navigation around the completed discovery workflow: removed the
+global Recipe Book search from every page, moved Inboxes and the boxed Log out
+action to the right edge of the top bar, removed Subscriptions from desktop and
+mobile navigation, and removed the duplicate Discover dinner action from Home.
+The remaining Home import action now opens Discover, where known-link imports
+live (`components/app-shell/app-shell.tsx`, `app/(app)/app/page.tsx`,
+`app/globals.css`).
