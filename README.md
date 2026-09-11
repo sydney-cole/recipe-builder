@@ -6,6 +6,10 @@ Tailwind CSS, and shadcn-style UI components. Account access and the Recipe Book
 are connected to Convex; discovery and subscription flows still use local mock
 data while their backend integrations are being built.
 
+For the public hackathon deployment, follow the
+[ChatGPT Sites deployment runbook](./CHATGPT_SITES.md). The hosted Site keeps
+Convex as the production database and application backend.
+
 ## Run the code locally
 
 ### Prerequisites

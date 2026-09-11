@@ -65,6 +65,24 @@ const recipeIngredientValidator = v.object({
   isOptional: v.boolean(),
 });
 
+const importStatusValidator = v.union(
+  v.literal("queued"),
+  v.literal("scraping"),
+  v.literal("scraped"),
+  v.literal("processing"),
+  v.literal("parsed"),
+  v.literal("needs_review"),
+  v.literal("completed"),
+  v.literal("failed"),
+);
+
+const importReviewValidator = v.object({
+  importId: v.id("recipeImports"),
+  status: importStatusValidator,
+  warnings: v.array(v.string()),
+  generatedGroceryListId: v.optional(v.id("groceryLists")),
+});
+
 async function requireUser(ctx: QueryCtx) {
   const userId = await getAuthUserId(ctx);
   if (userId === null) {
@@ -149,6 +167,7 @@ export const get = query({
           isFavorite: v.boolean(),
         }),
       ),
+      importReview: v.union(v.null(), importReviewValidator),
     }),
   ),
   handler: async (ctx, { recipeId }) => {
@@ -178,6 +197,18 @@ export const get = query({
       )
       .unique();
 
+    const recipeImport =
+      recipe.importId === undefined ? null : await ctx.db.get(recipe.importId);
+    const importReview =
+      recipeImport?.requestedBy === userId
+        ? {
+            importId: recipeImport._id,
+            status: recipeImport.status,
+            warnings: recipeImport.agentWarnings ?? [],
+            generatedGroceryListId: recipeImport.generatedGroceryListId,
+          }
+        : null;
+
     return {
       recipe,
       ingredients,
@@ -185,6 +216,7 @@ export const get = query({
         savedRecipe === null
           ? null
           : { notes: savedRecipe.notes, isFavorite: savedRecipe.isFavorite },
+      importReview,
     };
   },
 });

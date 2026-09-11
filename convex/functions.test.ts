@@ -485,6 +485,48 @@ describe("editable recipe cards", () => {
     await asOwner.mutation(api.recipeCards.removeCard, { recipeId });
     expect(await asOwner.query(api.recipes.get, { recipeId })).toBeNull();
   });
+
+  it("shows import review details to the owner and acknowledges review", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "ReviewOwner");
+    const otherId = await createUser(t, "ReviewVisitor");
+    const recipeId = await createRecipe(t, "reviewable", {
+      requestedBy: ownerId,
+    });
+    const importId = await t.run(async (ctx) => {
+      const recipe = await ctx.db.get(recipeId);
+      if (recipe?.importId === undefined) throw new Error("Missing import");
+      await ctx.db.patch(recipe.importId, {
+        status: "needs_review",
+        agentWarnings: ["Check the cooking time."],
+        updatedAt: Date.now(),
+      });
+      return recipe.importId;
+    });
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const asOther = t.withIdentity({ subject: otherId });
+
+    expect(await asOwner.query(api.recipes.get, { recipeId })).toMatchObject({
+      importReview: {
+        importId,
+        status: "needs_review",
+        warnings: ["Check the cooking time."],
+      },
+    });
+    await expect(
+      asOther.mutation(api.recipeCards.acknowledgeReview, { recipeId }),
+    ).rejects.toThrow(/Forbidden/);
+
+    await asOwner.mutation(api.recipeCards.acknowledgeReview, { recipeId });
+    await asOwner.mutation(api.recipeCards.acknowledgeReview, { recipeId });
+    expect(await asOwner.query(api.recipes.get, { recipeId })).toMatchObject({
+      importReview: {
+        importId,
+        status: "completed",
+        warnings: ["Check the cooking time."],
+      },
+    });
+  });
 });
 
 describe("editable grocery lists", () => {

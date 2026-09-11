@@ -326,6 +326,29 @@ export const removeIngredient = mutation({
   },
 });
 
+export const acknowledgeReview = mutation({
+  args: { recipeId: v.id("recipes") },
+  returns: v.null(),
+  handler: async (ctx, { recipeId }) => {
+    const userId = await requireUser(ctx);
+    const recipe = await requireOwnedRecipe(ctx, userId, recipeId);
+    if (recipe.importId === undefined) throw new Error("Recipe is not editable");
+    const recipeImport = await ctx.db.get(recipe.importId);
+    if (recipeImport === null || recipeImport.requestedBy !== userId) {
+      throw new Error("Forbidden");
+    }
+    if (recipeImport.status === "completed") return null;
+    if (recipeImport.status !== "needs_review") {
+      throw new Error("Recipe is not awaiting review");
+    }
+    await ctx.db.patch(recipeImport._id, {
+      status: "completed",
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
 export const removeCard = mutation({
   args: { recipeId: v.id("recipes") },
   returns: v.null(),
