@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-10T21:24:32Z
+- **Last updated:** 2026-09-11T18:46:48Z
 
 ## Log
 
@@ -108,3 +108,20 @@ authenticated backend test coverage (`convex/groceryLists.ts`,
 `convex/recipeAgent.ts`, `convex/recipeAgentData.ts`, `components/grocery/`,
 `components/recipes/`, `app/(app)/app/grocery-lists/`,
 `app/(app)/app/page.tsx`).
+
+### 2026-09-11 - working tree
+Replaced mock Discover recommendations with an authenticated Convex action that
+accepts one or more ingredient, flavor, cuisine, or dish constraints. Firecrawl
+searches and extracts evidence from up to eight live recipe pages, then the
+persistent OpenAI-powered Convex Agent ranks one to three choices without
+inventing ratings or review counts. Choosing a result now queues its source URL
+through the existing durable Firecrawl recipe-import workflow and opens import
+progress. Added loading, empty, validation, failure, rating-evidence, and source
+attribution states plus focused UI tests (`convex/recipeDiscovery.ts`,
+`convex/recipeIngestion.ts`, `components/discovery/discover-form.tsx`). Selected
+search constraints remain visible as chips, can be accumulated back into the
+input for reuse, and are removed only through their dedicated accessible remove
+controls. The six-chip limit evicts the oldest constraint when a newer one is
+added. The new functions are on the development deployment; live ranking
+verification is pending successful configuration of the deployment-scoped
+OpenAI API key.

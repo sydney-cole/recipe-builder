@@ -19,6 +19,7 @@ import type * as lib_urls from "../lib/urls.js";
 import type * as recipeAgent from "../recipeAgent.js";
 import type * as recipeAgentData from "../recipeAgentData.js";
 import type * as recipeCards from "../recipeCards.js";
+import type * as recipeDiscovery from "../recipeDiscovery.js";
 import type * as recipeIngestion from "../recipeIngestion.js";
 import type * as recipes from "../recipes.js";
 import type * as seed from "../seed.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   recipeAgent: typeof recipeAgent;
   recipeAgentData: typeof recipeAgentData;
   recipeCards: typeof recipeCards;
+  recipeDiscovery: typeof recipeDiscovery;
   recipeIngestion: typeof recipeIngestion;
   recipes: typeof recipes;
   seed: typeof seed;

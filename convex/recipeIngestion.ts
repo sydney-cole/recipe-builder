@@ -1,4 +1,5 @@
 import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
@@ -7,6 +8,7 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  mutation,
   type MutationCtx,
 } from "./_generated/server";
 import { buildRecipeScrapePayload } from "./lib/recipeScrape";
@@ -133,6 +135,29 @@ export const queueAgentDiscoveredUrl = internalMutation({
     }
     const queued = await queueRecipeSource(ctx, {
       ...args,
+      sourceKind: "agent_discovery",
+    });
+    return queued.importId;
+  },
+});
+
+export const queueDiscoveredUrl = mutation({
+  args: {
+    sourceUrl: v.string(),
+    sourceQuery: v.string(),
+  },
+  returns: v.id("recipeImports"),
+  handler: async (ctx, { sourceUrl, sourceQuery }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Unauthenticated");
+    const normalizedQuery = sourceQuery.trim();
+    if (normalizedQuery.length === 0 || normalizedQuery.length > 500) {
+      throw new Error("Source query must be between 1 and 500 characters");
+    }
+    const queued = await queueRecipeSource(ctx, {
+      userId,
+      sourceUrl,
+      sourceQuery: normalizedQuery,
       sourceKind: "agent_discovery",
     });
     return queued.importId;

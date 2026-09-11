@@ -146,7 +146,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .quick-action strong, .quick-action small { display: block; }
 .quick-action small { margin-top: .2rem; color: var(--muted-foreground); }
 .search-workbench { border: 1px solid var(--border); border-radius: 1rem; background: linear-gradient(135deg, #fff, var(--surface-subtle)); padding: clamp(1.25rem, 4vw, 2.5rem); box-shadow: 0 16px 42px rgb(28 35 27 / .07); }
-.filter-chip { display: inline-flex; min-height: 34px; align-items: center; gap: .35rem; border: 1px solid #b9cbb5; border-radius: 999px; background: var(--primary-soft); color: var(--primary); padding: .35rem .7rem; font-size: .78rem; font-weight: 750; cursor: pointer; }
+.filter-chip { display: inline-flex; min-height: 34px; align-items: center; gap: .35rem; border: 1px solid #b9cbb5; border-radius: 999px; background: var(--primary-soft); color: var(--primary); padding: .35rem .7rem; font-size: .78rem; font-weight: 750; }
 .import-hero { background: linear-gradient(145deg, #fff 30%, var(--accent-soft)); }
 .grocery-row { display: grid; grid-template-columns: auto minmax(0, 1fr) 68px 82px auto; align-items: center; gap: .65rem; padding: .8rem 1rem; }
 .grocery-row .input { min-height: 38px; padding: .45rem .55rem; box-shadow: none; }
