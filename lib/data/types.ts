@@ -2,8 +2,8 @@ export type Recipe = {
   id: string;
   title: string;
   description: string;
-  totalMinutes: number;
-  servings: number;
+  totalMinutes?: number;
+  servings?: number;
   source: string;
   tags: string[];
   art: "garden" | "citrus" | "tomato" | "berry";

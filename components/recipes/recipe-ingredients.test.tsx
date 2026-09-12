@@ -46,4 +46,13 @@ describe("ingredient scaling", () => {
     expect(screen.getByText("For 5 servings")).toBeInTheDocument();
     expect(screen.getByText("1.88 cups chickpeas drained")).toBeInTheDocument();
   });
+
+  it("preserves source amounts when the recipe has no serving count", () => {
+    render(<RecipeIngredients ingredients={ingredients} />);
+    expect(screen.getByText("Original recipe amounts")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Increase servings" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("1 1/2 cups chickpeas, drained")).toBeInTheDocument();
+  });
 });

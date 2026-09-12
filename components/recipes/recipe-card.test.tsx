@@ -53,4 +53,14 @@ describe("RecipeCard", () => {
       "garden",
     );
   });
+
+  it("does not invent time or serving metadata when the source omitted it", () => {
+    render(
+      <RecipeCard
+        recipe={{ ...recipe, totalMinutes: undefined, servings: undefined }}
+      />,
+    );
+    expect(screen.queryByText(/\b0 min\b/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^0$/)).not.toBeInTheDocument();
+  });
 });

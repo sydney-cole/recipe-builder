@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { normalizeRecipeUrl, recipeLinksFromMessage } from "./urls";
+import {
+  isPublicUrlHostname,
+  normalizeRecipeUrl,
+  recipeLinksFromMessage,
+} from "./urls";
 
 describe("normalizeRecipeUrl", () => {
   it("normalizes whitespace, tracking parameters, fragments, and query order", () => {
@@ -24,6 +28,25 @@ describe("normalizeRecipeUrl", () => {
   it("bounds input size", () => {
     expect(() => normalizeRecipeUrl(`https://example.com/${"a".repeat(2_100)}`)).toThrow(
       /2,048/,
+    );
+  });
+
+  it.each([
+    "http://localhost/recipe",
+    "http://recipes.local/dinner",
+    "http://service.internal/recipe",
+    "http://127.0.0.1/recipe",
+    "http://2130706433/recipe",
+    "http://[::1]/recipe",
+    "https://intranet/recipe",
+  ])("rejects non-public hosts: %s", (url) => {
+    expect(() => normalizeRecipeUrl(url)).toThrow(/public internet host/);
+  });
+
+  it("accepts public DNS hosts, including a trailing root label", () => {
+    expect(isPublicUrlHostname("Recipes.Example.COM.")).toBe(true);
+    expect(normalizeRecipeUrl("https://recipes.example.com./dinner")).toBe(
+      "https://recipes.example.com./dinner",
     );
   });
 });

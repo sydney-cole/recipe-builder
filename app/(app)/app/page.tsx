@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
-import { recipeArt } from "@/lib/data/recipe-view";
+import { recipeArt, recipeTotalMinutes } from "@/lib/data/recipe-view";
 import type { Recipe } from "@/lib/data/types";
 
 const quickActions = [
@@ -47,10 +47,8 @@ export default function DashboardPage() {
       title: recipe.title,
       description:
         recipe.description ?? "A recipe saved to your PerfectPlate collection.",
-      totalMinutes:
-        recipe.totalTimeMinutes ??
-        (recipe.prepTimeMinutes ?? 0) + (recipe.cookTimeMinutes ?? 0),
-      servings: recipe.servings ?? 0,
+      totalMinutes: recipeTotalMinutes(recipe),
+      servings: recipe.servings,
       source: recipe.sourceSite ?? "Imported recipe",
       tags: recipe.categories.slice(0, 3),
       art: recipeArt(recipe.title),

@@ -42,20 +42,23 @@ export function RecipeIngredients({
   initialServings,
 }: {
   ingredients: Ingredient[];
-  initialServings: number;
+  initialServings?: number;
 }) {
-  const baseServings = Math.max(1, initialServings);
+  const baseServings = Math.max(1, initialServings ?? 1);
   const [servings, setServings] = useState(baseServings);
   const multiplier = servings / baseServings;
+  const canScale = initialServings !== undefined;
 
   return (
     <section>
       <div className="section-row">
         <div>
           <h2 className="section-heading">Ingredients</h2>
-          <p className="section-copy" aria-live="polite">For {servings} servings</p>
+          <p className="section-copy" aria-live="polite">
+            {canScale ? `For ${servings} servings` : "Original recipe amounts"}
+          </p>
         </div>
-        <div className="cluster">
+        {canScale && <div className="cluster">
           <Button
             size="icon"
             variant="secondary"
@@ -73,7 +76,7 @@ export function RecipeIngredients({
           >
             <Plus size={16} />
           </Button>
-        </div>
+        </div>}
       </div>
       <Card>
         <CardContent>

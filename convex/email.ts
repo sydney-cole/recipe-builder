@@ -136,6 +136,8 @@ export const onMessageReceived = internalMutation({
   args: { message: v.any(), thread: v.any(), eventId: v.string() },
   returns: v.object({ queued: v.number() }),
   handler: async (ctx, { message, eventId }) => {
+    const sourceEventId = eventId.trim().slice(0, 500);
+    if (sourceEventId.length === 0) return { queued: 0 };
     const inboxId = optionalStringField(message, "inbox_id");
     if (inboxId === undefined) return { queued: 0 };
 
@@ -147,7 +149,9 @@ export const onMessageReceived = internalMutation({
 
     const alreadyHandled = await ctx.db
       .query("recipeImports")
-      .withIndex("by_source_event", (q) => q.eq("sourceEventId", eventId))
+      .withIndex("by_source_event", (q) =>
+        q.eq("sourceEventId", sourceEventId),
+      )
       .first();
     if (alreadyHandled !== null) return { queued: 0 };
 
@@ -162,7 +166,7 @@ export const onMessageReceived = internalMutation({
         sourceUrl: normalizedUrl,
         sourceKind: "email",
         sourceMessageId,
-        sourceEventId: eventId,
+        sourceEventId,
         sourceSubject,
       });
       if (result.queued) queued += 1;

@@ -34,7 +34,12 @@ export function RecipeCard({
           {detailsHref ? <Link href={detailsHref}><h3>{recipe.title}</h3></Link> : <h3>{recipe.title}</h3>}
           <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{recipe.description}</p>
         </div>
-        <div className="recipe-meta"><span><Clock3 size={14} className="inline" /> {recipe.totalMinutes} min</span><span><Users size={14} className="inline" /> {recipe.servings}</span></div>
+        {(recipe.totalMinutes !== undefined || recipe.servings !== undefined) && (
+          <div className="recipe-meta">
+            {recipe.totalMinutes !== undefined && <span><Clock3 size={14} className="inline" /> {recipe.totalMinutes} min</span>}
+            {recipe.servings !== undefined && <span><Users size={14} className="inline" /> {recipe.servings}</span>}
+          </div>
+        )}
         {recipe.matchReason && <p className="rounded-lg bg-primary-soft p-3 text-sm leading-5 text-primary"><strong>Why it fits:</strong> {recipe.matchReason}</p>}
         {recipe.missingIngredients && <p className="text-xs text-muted-foreground">Missing: {recipe.missingIngredients.join(", ")}</p>}
         <div className="cluster">{recipe.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>

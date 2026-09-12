@@ -77,6 +77,11 @@ type QueueRecipeSourceArgs = {
   sourceSubject?: string;
 };
 
+function boundedMetadata(value: string | undefined, maximum: number) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed.slice(0, maximum) : undefined;
+}
+
 export async function queueRecipeSource(
   ctx: MutationCtx,
   args: QueueRecipeSourceArgs,
@@ -110,9 +115,9 @@ export async function queueRecipeSource(
     normalizedUrl,
     sourceKind: args.sourceKind,
     sourceQuery: args.sourceQuery?.trim().slice(0, 500) || undefined,
-    sourceMessageId: args.sourceMessageId,
-    sourceEventId: args.sourceEventId,
-    sourceSubject: args.sourceSubject,
+    sourceMessageId: boundedMetadata(args.sourceMessageId, 500),
+    sourceEventId: boundedMetadata(args.sourceEventId, 500),
+    sourceSubject: boundedMetadata(args.sourceSubject, 1_000),
     status: "queued",
     attemptCount: 0,
     createdAt: now,

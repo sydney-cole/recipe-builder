@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
-import { recipeArt } from "@/lib/data/recipe-view";
+import { recipeArt, recipeTotalMinutes } from "@/lib/data/recipe-view";
 import { FoodArt } from "./food-art";
 import { RecipeIngredients } from "./recipe-ingredients";
 
@@ -99,7 +99,7 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
 
   const { recipe, ingredients, importReview } = data;
   const recipeDocId = recipe._id as Id<"recipes">;
-  const totalMinutes = recipe.totalTimeMinutes ?? (recipe.prepTimeMinutes ?? 0) + (recipe.cookTimeMinutes ?? 0);
+  const totalMinutes = recipeTotalMinutes(recipe);
   const tags = recipe.categories.length > 0 ? recipe.categories : recipe.cuisines;
 
   async function saveRecipe() {
@@ -187,12 +187,12 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
       {(error || message) && <p className={`mb-4 rounded-lg p-3 text-sm font-semibold ${error ? "bg-red-50 text-red-700" : "bg-primary-soft text-primary"}`} role={error ? "alert" : "status"}>{error || message}</p>}
 
       <div className="recipe-detail-hero">
-        <FoodArt variant={recipeArt(recipe.title)} label={tags[0] ?? "Recipe"} />
+        <FoodArt variant={recipeArt(recipe.title)} label={tags[0] ?? "Recipe"} imageUrl={recipe.imageUrl} />
         <div className="p-6 sm:p-8">
           <div className="cluster">{tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
           <h1 className="mt-4 font-display text-4xl font-semibold leading-tight sm:text-5xl">{recipe.title}</h1>
           {recipe.description && <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">{recipe.description}</p>}
-          <div className="mt-6 cluster text-sm font-bold text-muted-foreground"><span><Clock3 className="inline" size={17} /> {totalMinutes} min</span><span><Users className="inline" size={17} /> {recipe.servings ?? "—"} servings</span></div>
+          {(totalMinutes !== undefined || recipe.servings !== undefined) && <div className="mt-6 cluster text-sm font-bold text-muted-foreground">{totalMinutes !== undefined && <span><Clock3 className="inline" size={17} /> {totalMinutes} min</span>}{recipe.servings !== undefined && <span><Users className="inline" size={17} /> {recipe.servings} servings</span>}</div>}
           <div className="mt-7 cluster">
             {importReview?.generatedGroceryListId ? <Button asChild><Link href={`/app/grocery-lists/${importReview.generatedGroceryListId}`}><ShoppingBasket size={17} />Open generated list</Link></Button> : <Button asChild><Link href="/app/grocery-lists"><ShoppingBasket size={17} />Open grocery lists</Link></Button>}
             <Button variant="secondary" onClick={() => setEditing((current) => !current)}><Pencil size={17} />{editing ? "Close editor" : "Edit recipe"}</Button>
@@ -207,7 +207,7 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
       )}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[.85fr_1.15fr]">
-        <RecipeIngredients ingredients={ingredients} initialServings={recipe.servings ?? 1} />
+        <RecipeIngredients ingredients={ingredients} initialServings={recipe.servings} />
         <section><h2 className="section-heading">Instructions</h2><p className="section-copy mb-4">A clean, distraction-free cooking view.</p><ol className="stack">{recipe.instructions.map((instruction) => <li className="flex gap-4 rounded-xl border border-border bg-white p-5" key={instruction.position}><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-sm font-extrabold text-white">{instruction.position}</span><p className="pt-1 text-sm leading-6">{instruction.text}</p></li>)}</ol></section>
       </div>
 

@@ -25,6 +25,43 @@ const saveItem = v.object({
   isChecked: v.boolean(),
   sortOrder: v.number(),
 });
+const groceryListValidator = v.object({
+  _id: v.id("groceryLists"),
+  _creationTime: v.number(),
+  userId: v.id("users"),
+  clientRequestId: v.optional(v.string()),
+  name: v.string(),
+  sourceRecipeId: v.optional(v.id("recipes")),
+  sourceRecipeTitle: v.optional(v.string()),
+  status: groceryListStatus,
+  completedAt: v.optional(v.number()),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+});
+const groceryListItemValidator = v.object({
+  _id: v.id("groceryListItems"),
+  _creationTime: v.number(),
+  listId: v.id("groceryLists"),
+  ingredientId: v.optional(v.id("ingredients")),
+  name: v.string(),
+  normalizedName: v.string(),
+  quantity: v.optional(v.number()),
+  quantityText: v.optional(v.string()),
+  unit: v.optional(v.string()),
+  category: v.optional(v.string()),
+  notes: v.optional(v.string()),
+  isChecked: v.boolean(),
+  sortOrder: v.number(),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+});
+
+const TEXT_LIMITS = {
+  quantityText: 100,
+  unit: 100,
+  category: 100,
+  notes: 500,
+} as const;
 
 async function requireQueryUser(ctx: QueryCtx) {
   const userId = await getAuthUserId(ctx);
@@ -38,10 +75,14 @@ async function requireMutationUser(ctx: MutationCtx) {
   return userId;
 }
 
-function optionalString(value: string | null) {
+function optionalString(value: string | null, label: string, maximum: number) {
   if (value === null) return undefined;
   const trimmed = value.trim();
-  return trimmed.length === 0 ? undefined : trimmed;
+  if (trimmed.length === 0) return undefined;
+  if (trimmed.length > maximum) {
+    throw new Error(`${label} must be at most ${maximum} characters`);
+  }
+  return trimmed;
 }
 
 function normalizeIngredientName(value: string) {
@@ -118,7 +159,7 @@ async function requireOwnedItem(
 
 export const listMine = query({
   args: {},
-  returns: v.array(v.any()),
+  returns: v.array(groceryListValidator),
   handler: async (ctx) => {
     const userId = await requireQueryUser(ctx);
     return await ctx.db
@@ -133,7 +174,10 @@ export const get = query({
   args: { listId: v.id("groceryLists") },
   returns: v.union(
     v.null(),
-    v.object({ list: v.any(), items: v.array(v.any()) }),
+    v.object({
+      list: groceryListValidator,
+      items: v.array(groceryListItemValidator),
+    }),
   ),
   handler: async (ctx, { listId }) => {
     const userId = await requireQueryUser(ctx);
@@ -312,16 +356,30 @@ export const save = mutation({
       }
       const sortOrder = validatedSortOrder(item.sortOrder);
       const quantityText =
-        item.quantityText === undefined ? undefined : optionalString(item.quantityText);
+        item.quantityText === undefined
+          ? undefined
+          : optionalString(
+              item.quantityText,
+              "Quantity text",
+              TEXT_LIMITS.quantityText,
+            );
       const patch = {
         name: itemName,
         normalizedName: normalizeIngredientName(itemName),
         quantity: undefined,
         quantityText,
-        unit: item.unit === undefined ? undefined : optionalString(item.unit),
+        unit:
+          item.unit === undefined
+            ? undefined
+            : optionalString(item.unit, "Unit", TEXT_LIMITS.unit),
         category:
-          item.category === undefined ? undefined : optionalString(item.category),
-        notes: item.notes === undefined ? undefined : optionalString(item.notes),
+          item.category === undefined
+            ? undefined
+            : optionalString(item.category, "Category", TEXT_LIMITS.category),
+        notes:
+          item.notes === undefined
+            ? undefined
+            : optionalString(item.notes, "Notes", TEXT_LIMITS.notes),
         isChecked: item.isChecked,
         sortOrder,
         updatedAt: now,
@@ -613,11 +671,25 @@ export const addItem = mutation({
           ? undefined
           : validQuantity(args.quantity),
       quantityText:
-        args.quantityText === undefined ? undefined : optionalString(args.quantityText),
-      unit: args.unit === undefined ? undefined : optionalString(args.unit),
+        args.quantityText === undefined
+          ? undefined
+          : optionalString(
+              args.quantityText,
+              "Quantity text",
+              TEXT_LIMITS.quantityText,
+            ),
+      unit:
+        args.unit === undefined
+          ? undefined
+          : optionalString(args.unit, "Unit", TEXT_LIMITS.unit),
       category:
-        args.category === undefined ? undefined : optionalString(args.category),
-      notes: args.notes === undefined ? undefined : optionalString(args.notes),
+        args.category === undefined
+          ? undefined
+          : optionalString(args.category, "Category", TEXT_LIMITS.category),
+      notes:
+        args.notes === undefined
+          ? undefined
+          : optionalString(args.notes, "Notes", TEXT_LIMITS.notes),
       isChecked: false,
       sortOrder: (lastItem?.sortOrder ?? 0) + 1,
       createdAt: now,
@@ -658,7 +730,13 @@ export const updateItem = mutation({
         args.quantity === null ? undefined : validQuantity(args.quantity);
     }
     for (const field of ["quantityText", "unit", "category", "notes"] as const) {
-      if (args[field] !== undefined) patch[field] = optionalString(args[field]);
+      if (args[field] !== undefined) {
+        const label =
+          field === "quantityText"
+            ? "Quantity text"
+            : `${field[0].toUpperCase()}${field.slice(1)}`;
+        patch[field] = optionalString(args[field], label, TEXT_LIMITS[field]);
+      }
     }
     if (args.isChecked !== undefined) patch.isChecked = args.isChecked;
     if (args.sortOrder !== undefined) {

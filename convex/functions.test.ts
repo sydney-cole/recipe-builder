@@ -4,7 +4,7 @@ import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
-const modules = import.meta.glob("./**/!(*.test).ts");
+const modules = import.meta.glob("./**/*.*s");
 
 function initTest() {
   return convexTest(schema, modules);
@@ -175,6 +175,43 @@ describe("email functions", () => {
       message: { inbox_id: "unknown", text: "https://example.com/other" },
     });
     expect(unknownInbox).toEqual({ queued: 0 });
+  });
+
+  it("bounds webhook event identifiers before deduplication", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "Bounded Webhook");
+    const longEventId = `event-${"x".repeat(600)}`;
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      await ctx.db.insert("userInboxes", {
+        userId,
+        inboxId: "bounded-inbox",
+        email: "bounded@example.com",
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://example.com/recipe",
+        normalizedUrl: "https://example.com/recipe",
+        sourceEventId: longEventId.slice(0, 500),
+        status: "queued",
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+
+    expect(
+      await t.mutation(internal.email.onMessageReceived, {
+        eventId: longEventId,
+        thread: {},
+        message: {
+          inbox_id: "bounded-inbox",
+          text: "https://example.com/another-recipe",
+        },
+      }),
+    ).toEqual({ queued: 0 });
   });
 });
 
@@ -1000,6 +1037,28 @@ describe("grocery list validation branches", () => {
         quantity: -1,
       }),
     ).rejects.toThrow(/Quantity/);
+    await expect(
+      asOwner.mutation(api.groceryLists.addItem, {
+        listId,
+        name: "Milk",
+        unit: "x".repeat(101),
+      }),
+    ).rejects.toThrow(/Unit must be at most 100 characters/);
+    await expect(
+      asOwner.mutation(api.groceryLists.save, {
+        listId,
+        requestId: "bounded-list-fields",
+        name: "Editable list",
+        items: [
+          {
+            name: "Milk",
+            notes: "x".repeat(501),
+            isChecked: false,
+            sortOrder: 1,
+          },
+        ],
+      }),
+    ).rejects.toThrow(/Notes must be at most 500 characters/);
 
     const firstItemId = await asOwner.mutation(api.groceryLists.addItem, {
       listId,

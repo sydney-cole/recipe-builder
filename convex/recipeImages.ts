@@ -4,6 +4,7 @@ import { components, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, type ActionCtx } from "./_generated/server";
 import { buildRecipeScrapePayload } from "./lib/recipeScrape";
+import { isPublicUrlHostname } from "./lib/urls";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
 
@@ -17,34 +18,13 @@ const ALLOWED_IMAGE_TYPES = new Set([
   "image/webp",
 ]);
 
-function isPrivateHost(hostname: string) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (
-    host === "localhost" ||
-    host === "::1" ||
-    host.endsWith(".localhost") ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal") ||
-    host.includes(":")
-  ) {
-    return true;
-  }
-  const parts = host.split(".");
-  if (parts.length !== 4 || parts.some((part) => !/^\d+$/.test(part))) {
-    return false;
-  }
-  // Recipe publishers use named CDN hosts. Reject every literal IP so a
-  // page-authored image URL cannot target internal or metadata services.
-  return true;
-}
-
 function safeImageUrl(value: string) {
   const url = new URL(value);
   if (!(["http:", "https:"] as string[]).includes(url.protocol)) {
     throw new Error("Unsupported recipe image protocol");
   }
   if (url.username || url.password) throw new Error("Image URL credentials are not allowed");
-  if (isPrivateHost(url.hostname)) {
+  if (!isPublicUrlHostname(url.hostname)) {
     throw new Error("Recipe image host is not public");
   }
   return url;

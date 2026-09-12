@@ -2,6 +2,30 @@ const MAX_URL_LENGTH = 2_048;
 const MAX_LINKS_PER_MESSAGE = 10;
 const TRACKING_PARAMETERS = new Set(["fbclid", "gclid"]);
 
+export function isPublicUrlHostname(hostname: string) {
+  const host = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
+  if (
+    host.length === 0 ||
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host.includes(":") ||
+    !host.includes(".")
+  ) {
+    return false;
+  }
+
+  const parts = host.split(".");
+  // WHATWG URL parsing canonicalizes unusual IPv4 forms (for example,
+  // 2130706433) before this check. Reject all literal IPs so imports cannot
+  // target loopback, private-network, or cloud-metadata services.
+  return parts.length !== 4 || parts.some((part) => !/^\d+$/.test(part));
+}
+
 export function normalizeRecipeUrl(value: string) {
   const trimmed = value.trim();
   if (trimmed.length === 0 || trimmed.length > MAX_URL_LENGTH) {
@@ -14,6 +38,9 @@ export function normalizeRecipeUrl(value: string) {
   }
   if (url.username || url.password) {
     throw new Error("Recipe links cannot contain credentials");
+  }
+  if (!isPublicUrlHostname(url.hostname)) {
+    throw new Error("Recipe links must use a public internet host");
   }
 
   url.hash = "";
