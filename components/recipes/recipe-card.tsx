@@ -3,7 +3,7 @@
 import { useMutation } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
-import { BookCheck, BookPlus, Clock3, ShoppingBasket, Users } from "lucide-react";
+import { BookCheck, BookPlus, Clock3, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,7 +25,8 @@ export function RecipeCard({
   detailsHref?: string | null;
   canCreateGroceryList?: boolean;
 }) {
-  const [saved, setSaved] = useState(!suggested);
+  const [savedLocally, setSavedLocally] = useState(false);
+  const saved = !suggested || savedLocally;
   const [saveError, setSaveError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const addToBook = useMutation(api.recipeCards.addToBook);
@@ -35,7 +36,7 @@ export function RecipeCard({
     setSaveError(false);
     try {
       await addToBook({ recipeId: recipe.id as Id<"recipes"> });
-      setSaved(true);
+      setSavedLocally(true);
     } catch {
       setSaveError(true);
     } finally {
@@ -55,34 +56,21 @@ export function RecipeCard({
           {detailsHref ? <Link href={detailsHref}><h3>{recipe.title}</h3></Link> : <h3>{recipe.title}</h3>}
           <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{recipe.description}</p>
         </div>
-        {(recipe.totalMinutes !== undefined || recipe.servings !== undefined) && (
+        {(recipe.totalMinutes !== undefined || recipe.servings !== undefined || saved) && (
           <div className="recipe-meta">
             {recipe.totalMinutes !== undefined && <span><Clock3 size={14} className="inline" /> {recipe.totalMinutes} min</span>}
             {recipe.servings !== undefined && <span><Users size={14} className="inline" /> {recipe.servings}</span>}
+            {saved && <Badge className="bg-primary-soft text-primary"><BookCheck size={13} />In Recipe Book</Badge>}
           </div>
         )}
         {recipe.matchReason && <p className="rounded-lg bg-primary-soft p-3 text-sm leading-5 text-primary"><strong>Why it fits:</strong> {recipe.matchReason}</p>}
         {recipe.missingIngredients && <p className="text-xs text-muted-foreground">Missing: {recipe.missingIngredients.join(", ")}</p>}
         <div className="cluster">{recipe.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Button variant={saved ? "secondary" : "default"} size="sm" onClick={() => void save()} disabled={saved || isSaving}>
-            {saved ? <BookCheck size={16} /> : <BookPlus size={16} />}{saved ? "In Recipe Book" : isSaving ? "Adding…" : "Add to Recipe Book"}
-          </Button>
-          {canCreateGroceryList || (suggested && saved) ? (
-            <AddRecipeToListButton recipeId={recipe.id} size="sm" />
-          ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled
-              title="Save this recipe before creating a grocery list"
-            >
-              <ShoppingBasket size={16} />
-              Create list
-            </Button>
-          )}
+          {!saved && <Button className="w-full" size="sm" onClick={() => void save()} disabled={isSaving}><BookPlus size={16} />{isSaving ? "Adding…" : "Add to Recipe Book"}</Button>}
+          <CurrentRecipeButton className="w-full" recipeId={recipe.id} variant="secondary" />
+          {(canCreateGroceryList || (suggested && saved)) && <AddRecipeToListButton className="w-full" recipeId={recipe.id} size="sm" />}
         </div>
-        <CurrentRecipeButton recipeId={recipe.id} />
         {saveError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t add this recipe to your book. Try again.</p>}
         <p className="text-xs text-muted-foreground">Source: {recipe.source}</p>
       </CardContent>

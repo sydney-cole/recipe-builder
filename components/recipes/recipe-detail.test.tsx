@@ -60,10 +60,7 @@ describe("RecipeDetail", () => {
     render(<RecipeDetail recipeId="recipe-1" />);
 
     expect(screen.getByText("Check the cooking time.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open generated list" })).toHaveAttribute(
-      "href",
-      "/app/grocery-lists/list-1",
-    );
+    expect(screen.getByRole("button", { name: "Add to grocery list" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Mark review complete" }));
     expect(mocks.mutation).toHaveBeenCalledWith({ recipeId: "recipe-1" });

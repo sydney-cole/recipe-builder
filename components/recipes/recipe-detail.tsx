@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, BookCheck, BookPlus, Check, Clock3, ExternalLink, Pencil, Plus, Save, ShoppingBasket, Trash2, Users } from "lucide-react";
+import { ArrowLeft, BookCheck, BookPlus, Check, Clock3, ExternalLink, Pencil, Plus, Save, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { EmptyState } from "@/components/feedback/empty-state";
+import { AddRecipeToListButton } from "@/components/grocery/add-recipe-to-list-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -204,14 +205,20 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
           <div className="cluster">{tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
           <h1 className="mt-4 font-display text-4xl font-semibold leading-tight sm:text-5xl">{recipe.title}</h1>
           {recipe.description && <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">{recipe.description}</p>}
-          {(totalMinutes !== undefined || recipe.servings !== undefined) && <div className="mt-6 cluster text-sm font-bold text-muted-foreground">{totalMinutes !== undefined && <span><Clock3 className="inline" size={17} /> {totalMinutes} min</span>}{recipe.servings !== undefined && <span><Users className="inline" size={17} /> {recipe.servings} servings</span>}</div>}
-          <div className="mt-7 cluster">
-            <CurrentRecipeButton recipeId={recipe._id} size="default" />
-            {data.saved === null ? <Button onClick={() => void saveToBook()}><BookPlus size={17} />Add to Recipe Book</Button> : <Button variant="secondary" disabled><BookCheck size={17} />In Recipe Book</Button>}
-            {importReview?.generatedGroceryListId ? <Button asChild><Link href={`/app/grocery-lists/${importReview.generatedGroceryListId}`}><ShoppingBasket size={17} />Open generated list</Link></Button> : <Button asChild><Link href="/app/grocery-lists"><ShoppingBasket size={17} />Open grocery lists</Link></Button>}
-            <Button variant="secondary" onClick={() => setEditing((current) => !current)}><Pencil size={17} />{editing ? "Close editor" : "Edit recipe"}</Button>
-            <Button asChild variant="secondary"><a href={recipe.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={17} />View original</a></Button>
-            <Button variant="ghost" onClick={() => void remove()}><Trash2 size={17} />Remove</Button>
+          <div className="mt-6 cluster text-sm font-bold text-muted-foreground">
+            {totalMinutes !== undefined && <span><Clock3 className="inline" size={17} /> {totalMinutes} min</span>}
+            {recipe.servings !== undefined && <span><Users className="inline" size={17} /> {recipe.servings} servings</span>}
+            {data.saved !== null && <Badge className="bg-primary-soft text-primary"><BookCheck size={14} />In Recipe Book</Badge>}
+          </div>
+          <div className="mt-7 flex flex-wrap items-center gap-3">
+            {data.saved === null && <Button onClick={() => void saveToBook()}><BookPlus size={17} />Add to Recipe Book</Button>}
+            <CurrentRecipeButton recipeId={recipe._id} size="default" variant={data.saved === null ? "secondary" : "default"} />
+            <AddRecipeToListButton recipeId={recipe._id} variant="secondary" />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-border pt-3">
+            <Button variant="ghost" size="sm" onClick={() => setEditing((current) => !current)}><Pencil size={16} />{editing ? "Close editor" : "Edit recipe"}</Button>
+            {recipe.sourceUrl && <Button asChild variant="ghost" size="sm"><a href={recipe.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} />View original</a></Button>}
+            <Button variant="ghost" size="sm" className="text-red-700 hover:bg-red-50" onClick={() => void remove()}><Trash2 size={16} />Remove recipe</Button>
           </div>
         </div>
       </div>

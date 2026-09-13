@@ -267,6 +267,41 @@ describe("recipe authorization", () => {
   });
 });
 
+describe("manual recipes", () => {
+  it("creates an editable recipe and explicitly adds it to the Recipe Book", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "ManualCook");
+    const asUser = t.withIdentity({ subject: userId });
+    const recipeId = await asUser.mutation(api.recipeCards.createManual, {
+      title: "Family pancakes",
+      description: "The Sunday version.",
+      sourceUrl: null,
+      servings: 4,
+      prepTimeMinutes: 10,
+      cookTimeMinutes: 15,
+      ingredients: ["2 cups flour", "2 eggs"],
+      instructions: ["Mix everything.", "Cook on a griddle."],
+    });
+
+    expect(await asUser.query(api.recipes.listBook)).toEqual([
+      expect.objectContaining({
+        _id: recipeId,
+        title: "Family pancakes",
+        sourceSite: "Manual recipe",
+        totalTimeMinutes: 25,
+      }),
+    ]);
+    expect(await asUser.query(api.recipes.get, { recipeId })).toMatchObject({
+      recipe: { _id: recipeId },
+      ingredients: [
+        { originalText: "2 cups flour", name: "flour", quantity: 2, quantityText: "2", unit: "cup" },
+        { originalText: "2 eggs", name: "eggs", quantity: 2 },
+      ],
+      saved: { isFavorite: false },
+    });
+  });
+});
+
 describe("recipe scrape persistence", () => {
   it("atomically stores one agent-ready artifact and completes idempotently", async () => {
     const t = initTest();
@@ -520,7 +555,7 @@ describe("agent-generated recipe persistence", () => {
         .withIndex("by_list", (q) => q.eq("listId", groceryListId))
         .collect();
       expect(groceryItems).toHaveLength(1);
-      expect(groceryItems[0]).toMatchObject({ name: "Spaghetti", quantity: 12 });
+      expect(groceryItems[0]).toMatchObject({ name: "spaghetti", quantity: 12 });
       expect((await ctx.db.get(importId))?.generatedGroceryListId).toBe(
         groceryListId,
       );
@@ -664,7 +699,7 @@ describe("editable grocery lists", () => {
     });
     expect(await asOwner.query(api.groceryLists.get, { listId })).toMatchObject({
       list: { name: "Saturday market", status: "completed" },
-      items: [{ name: "Cherry tomatoes", quantity: 3, isChecked: true }],
+      items: [{ name: "cherry tomatoes", quantity: 3, isChecked: true }],
     });
 
     await asOwner.mutation(api.groceryLists.removeList, { listId });
@@ -853,6 +888,57 @@ describe("recipe card validation branches", () => {
 });
 
 describe("grocery list validation branches", () => {
+  it("adds recipe ingredients to an existing list without duplicating the recipe", async () => {
+    const t = initTest();
+    const ownerId = await createUser(t, "ExistingListCook");
+    const asOwner = t.withIdentity({ subject: ownerId });
+    const recipeId = await createRecipe(t, "pancakes", { requestedBy: ownerId });
+    const unrelatedRecipeId = await createRecipe(t, "omelet", { requestedBy: ownerId });
+    const listId = await asOwner.mutation(api.groceryLists.create, { name: "Weekend" });
+    await asOwner.mutation(api.groceryLists.addItem, { listId, name: "Milk", quantity: 1, unit: "cup" });
+    await asOwner.mutation(api.groceryLists.addItem, { listId, name: "Large eggs", quantity: 2 });
+    await asOwner.mutation(api.groceryLists.addItem, { listId, name: "all-purpose flour", quantity: 1, unit: "cup" });
+    await asOwner.mutation(api.groceryLists.addItem, { listId, name: "kosher salt", quantity: 0.5, unit: "tsp" });
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      await ctx.db.insert("savedRecipes", { userId: ownerId, recipeId, isFavorite: false, createdAt: now, updatedAt: now });
+      await ctx.db.insert("recipeIngredients", { recipeId, position: 1, originalText: "16 tablespoons milk", name: "Milk", normalizedName: "milk", quantity: 16, unit: "tbsp", isOptional: false });
+      await ctx.db.insert("recipeIngredients", { recipeId, position: 2, originalText: "1 loaf bread", name: "Bread", normalizedName: "bread", quantity: 1, isOptional: false });
+      await ctx.db.insert("recipeIngredients", { recipeId, position: 3, originalText: "3 (large) eggs", name: "large eggs", normalizedName: "large eggs", quantity: 3, quantityText: "3 (large)", unit: "large eggs", isOptional: false });
+      await ctx.db.insert("recipeIngredients", { recipeId, position: 4, originalText: "32 tablespoons flour", name: "flour", normalizedName: "flour", quantity: 32, unit: "tbsp", isOptional: false });
+      await ctx.db.insert("recipeIngredients", { recipeId, position: 5, originalText: "1 tablespoon salt", name: "salt", normalizedName: "salt", quantity: 1, unit: "tbsp", isOptional: false });
+    });
+
+    await asOwner.mutation(api.groceryLists.addRecipeToList, { recipeId, listId });
+    await asOwner.mutation(api.groceryLists.addRecipeToList, { recipeId, listId });
+    await t.run(async (ctx) => {
+      const bread = await ctx.db
+        .query("groceryListItems")
+        .withIndex("by_list", (q) => q.eq("listId", listId))
+        .filter((q) => q.eq(q.field("normalizedName"), "bread"))
+        .unique();
+      const source = await ctx.db
+        .query("groceryListItemSources")
+        .withIndex("by_grocery_list_item", (q) =>
+          q.eq("groceryListItemId", bread!._id),
+        )
+        .unique();
+      // Simulate an older row that accidentally stored the grocery list's
+      // original recipe while retaining the correct recipe ingredient link.
+      await ctx.db.patch(source!._id, { recipeId: unrelatedRecipeId });
+    });
+    const result = await asOwner.query(api.groceryLists.get, { listId });
+    expect(result?.items).toHaveLength(5);
+    expect(result?.items.find((item) => item.normalizedName === "milk")).toMatchObject({ quantity: 2, quantityText: "2", unit: "cup" });
+    expect(result?.items.find((item) => item.normalizedName === "bread")).toMatchObject({ quantity: 1 });
+    expect(result?.items.find((item) => item.normalizedName === "eggs")).toMatchObject({ name: "eggs", quantity: 5, quantityText: "5" });
+    expect(result?.items.find((item) => item.normalizedName === "flour")).toMatchObject({ name: "flour", quantity: 3, quantityText: "3" });
+    expect(result?.items.find((item) => item.normalizedName === "salt")).toMatchObject({ name: "salt", quantity: 3.5, quantityText: "3.5", unit: "tsp" });
+    expect(result?.itemSources.find((source) =>
+      source.itemId === result.items.find((item) => item.normalizedName === "bread")?._id
+    )?.recipeTitles).toEqual(["pancakes"]);
+  });
+
   it("creates a renamed idempotent merged list and removes both originals", async () => {
     const t = initTest();
     const ownerId = await createUser(t, "ListCombiner");
@@ -867,9 +953,9 @@ describe("grocery list validation branches", () => {
     });
     await asOwner.mutation(api.groceryLists.addItem, {
       listId: firstListId,
-      name: "Milk",
+      name: "milk",
       quantity: 2,
-      unit: "cups",
+      unit: "cup",
     });
     await asOwner.mutation(api.groceryLists.addItem, {
       listId: secondListId,
@@ -920,13 +1006,13 @@ describe("grocery list validation branches", () => {
     expect(combined?.list.name).toBe("Weekly groceries");
     expect(combined?.items).toHaveLength(2);
     expect(combined?.items[0]).toMatchObject({
-      name: "Milk",
+      name: "milk",
       quantity: 5,
       quantityText: "5",
-      unit: "cups",
+      unit: "cup",
       isChecked: false,
     });
-    expect(combined?.items[1]).toMatchObject({ name: "Bread", quantity: 1 });
+    expect(combined?.items[1]).toMatchObject({ name: "bread", quantity: 1 });
   });
 
   it("atomically saves new and existing editable lists", async () => {
@@ -1013,11 +1099,11 @@ describe("grocery list validation branches", () => {
         .collect();
       expect(items).toHaveLength(2);
       expect(items[0]).toMatchObject({
-        name: "Oat milk",
+        name: "oat milk",
         quantityText: "3",
         isChecked: true,
       });
-      expect(items[1]).toMatchObject({ name: "Apples" });
+      expect(items[1]).toMatchObject({ name: "apples" });
     });
   });
 

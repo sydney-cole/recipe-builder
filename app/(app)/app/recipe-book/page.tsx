@@ -1,8 +1,9 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { BookOpen, Search } from "lucide-react";
+import { BookOpen, Plus, Search } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -14,11 +15,14 @@ import { api } from "@/convex/_generated/api";
 import { recipeArt, recipeTotalMinutes } from "@/lib/data/recipe-view";
 import type { Recipe } from "@/lib/data/types";
 import { filterAndSortRecipes, type RecipeSort } from "@/lib/recipes";
+import { ManualRecipeDialog } from "@/components/recipes/manual-recipe-dialog";
 
 export default function RecipeBookPage() {
+  const router = useRouter();
   const convexRecipes = useQuery(api.recipes.listBook);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<RecipeSort>("recent");
+  const [manualOpen, setManualOpen] = useState(false);
 
   const recipes = useMemo(() => {
     if (convexRecipes === undefined) return undefined;
@@ -43,7 +47,7 @@ export default function RecipeBookPage() {
         eyebrow="Your collection"
         title="Recipe Book"
         description="Every recipe you choose to save lives here."
-        actions={<Button asChild><Link href="/app/discover">Import recipe</Link></Button>}
+        actions={<div className="cluster"><Button onClick={() => setManualOpen(true)}><Plus size={17} />Add manually</Button><Button asChild variant="secondary"><Link href="/app/discover">Import recipe</Link></Button></div>}
       />
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <label className="relative flex-1">
@@ -74,6 +78,7 @@ export default function RecipeBookPage() {
       ) : (
         <div className="grid-auto">{recipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} canCreateGroceryList />)}</div>
       )}
+      <ManualRecipeDialog open={manualOpen} onOpenChange={setManualOpen} onCreated={(recipeId) => router.push(`/app/recipe-book/${recipeId}`)} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { BookCheck, BookPlus, CheckCircle2, LoaderCircle, TriangleAlert, X } from "lucide-react";
+import { BookCheck, BookPlus, CheckCircle2, LoaderCircle, PencilLine, TriangleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { RECIPE_IMPORT_STARTED_EVENT } from "@/lib/recipe-import-events";
 import { CurrentRecipeButton } from "./current-recipe-button";
+import { ManualRecipeDialog } from "./manual-recipe-dialog";
 
 type ImportStartedEvent = CustomEvent<{ importId: string }>;
 
@@ -100,6 +101,7 @@ export function RecipeImportNotifications() {
   const imports = useQuery(api.email.recentImports);
   const [trackedIds, setTrackedIds] = useState<string[]>([]);
   const [previewRecipeId, setPreviewRecipeId] = useState<Id<"recipes"> | null>(null);
+  const [manualImportId, setManualImportId] = useState<string | null>(null);
   const seenIds = useRef<Set<string> | null>(null);
 
   useEffect(() => {
@@ -156,6 +158,7 @@ export function RecipeImportNotifications() {
                   <p className="font-extrabold">{complete ? "Your recipe is ready" : failed ? "Recipe creation failed" : "Creating your recipe card"}</p>
                   <p className="mt-1 text-sm leading-5 text-muted-foreground">{complete ? "Preview it now, then add it to your Recipe Book if you want to keep it there." : failed ? failureMessage(recipeImport.errorMessage) : "We’re processing the source. You can keep using PerfectPlate while it finishes."}</p>
                   {complete && <Button className="mt-3" size="sm" onClick={() => setPreviewRecipeId(recipeImport.recipeId!)}>View recipe</Button>}
+                  {failed && <Button className="mt-3" size="sm" onClick={() => setManualImportId(recipeImport._id)}><PencilLine size={16} />Add manually</Button>}
                 </div>
                 <button className="grid size-7 shrink-0 place-items-center rounded-md hover:bg-surface-subtle" onClick={() => setTrackedIds((current) => current.filter((id) => id !== recipeImport._id))} aria-label="Dismiss recipe notification"><X size={16} /></button>
               </div>
@@ -164,6 +167,17 @@ export function RecipeImportNotifications() {
         })}
       </div>
       {previewRecipeId && <RecipePreviewModal recipeId={previewRecipeId} onClose={() => setPreviewRecipeId(null)} />}
+      <ManualRecipeDialog
+        key={manualImportId ?? "closed-manual-recipe"}
+        open={manualImportId !== null}
+        onOpenChange={(open) => { if (!open) setManualImportId(null); }}
+        initialSourceUrl={imports?.find((item) => item._id === manualImportId)?.sourceUrl ?? ""}
+        onCreated={(recipeId) => {
+          if (manualImportId) setTrackedIds((current) => current.filter((id) => id !== manualImportId));
+          setManualImportId(null);
+          setPreviewRecipeId(recipeId);
+        }}
+      />
     </>
   );
 }

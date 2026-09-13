@@ -5,6 +5,8 @@ import {
   mutation,
   type MutationCtx,
 } from "./_generated/server";
+import { normalizeRecipeUrl } from "./lib/urls";
+import { parseManualIngredient } from "./lib/manualIngredient";
 
 const instructionValidator = v.object({
   position: v.number(),
@@ -57,6 +59,100 @@ function optionalString(value: string | null) {
 function normalizeIngredientName(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
+
+export const createManual = mutation({
+  args: {
+    title: v.string(),
+    description: v.optional(nullableString),
+    sourceUrl: v.optional(nullableString),
+    servings: v.optional(nullableNumber),
+    prepTimeMinutes: v.optional(nullableNumber),
+    cookTimeMinutes: v.optional(nullableNumber),
+    ingredients: v.array(v.string()),
+    instructions: v.array(v.string()),
+  },
+  returns: v.id("recipes"),
+  handler: async (ctx, args) => {
+    const userId = await requireUser(ctx);
+    const title = args.title.trim();
+    if (title.length === 0 || title.length > 300) {
+      throw new Error("Recipe title must be between 1 and 300 characters");
+    }
+    const ingredients = args.ingredients.map((item) => item.trim()).filter(Boolean);
+    const instructions = args.instructions.map((item) => item.trim()).filter(Boolean);
+    if (ingredients.length === 0 || ingredients.length > 200) {
+      throw new Error("A recipe needs between 1 and 200 ingredients");
+    }
+    if (instructions.length === 0 || instructions.length > 100) {
+      throw new Error("A recipe needs between 1 and 100 instructions");
+    }
+    const sourceUrl = optionalString(args.sourceUrl ?? null);
+    const normalizedSourceUrl = sourceUrl
+      ? normalizeRecipeUrl(sourceUrl)
+      : `manual:${userId}:${Date.now()}`;
+    const servings = args.servings ?? undefined;
+    const prepTimeMinutes = args.prepTimeMinutes ?? undefined;
+    const cookTimeMinutes = args.cookTimeMinutes ?? undefined;
+    if (servings !== undefined && servings !== null) finiteNumber(servings, "servings", 0, 1_000);
+    if (prepTimeMinutes !== undefined && prepTimeMinutes !== null) finiteNumber(prepTimeMinutes, "prepTimeMinutes", 0, 10_080);
+    if (cookTimeMinutes !== undefined && cookTimeMinutes !== null) finiteNumber(cookTimeMinutes, "cookTimeMinutes", 0, 10_080);
+
+    const now = Date.now();
+    const importId = await ctx.db.insert("recipeImports", {
+      requestedBy: userId,
+      sourceUrl: sourceUrl ?? "",
+      normalizedUrl: normalizedSourceUrl,
+      status: "completed",
+      attemptCount: 0,
+      startedAt: now,
+      finishedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const recipeId = await ctx.db.insert("recipes", {
+      importId,
+      sourceUrl: sourceUrl ?? "",
+      normalizedSourceUrl,
+      isPublic: false,
+      sourceSite: sourceUrl ? new URL(sourceUrl).hostname.replace(/^www\./, "") : "Manual recipe",
+      title,
+      description: optionalString(args.description ?? null)?.slice(0, 2_000),
+      servings: servings === null ? undefined : servings,
+      prepTimeMinutes: prepTimeMinutes === null ? undefined : prepTimeMinutes,
+      cookTimeMinutes: cookTimeMinutes === null ? undefined : cookTimeMinutes,
+      totalTimeMinutes:
+        prepTimeMinutes !== undefined && prepTimeMinutes !== null && cookTimeMinutes !== undefined && cookTimeMinutes !== null
+          ? prepTimeMinutes + cookTimeMinutes
+          : undefined,
+      cuisines: [],
+      categories: [],
+      keywords: [],
+      instructions: instructions.map((text, index) => ({ position: index + 1, text })),
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(importId, { recipeId });
+    await ctx.db.insert("savedRecipes", {
+      userId,
+      recipeId,
+      isFavorite: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (const [index, originalText] of ingredients.entries()) {
+      const parsed = parseManualIngredient(originalText);
+      const ingredientId = await ingredientCatalogEntry(ctx, parsed.name, parsed.normalizedName, parsed.unit);
+      await ctx.db.insert("recipeIngredients", {
+        recipeId,
+        ingredientId,
+        position: index + 1,
+        ...parsed,
+        isOptional: false,
+      });
+    }
+    return recipeId;
+  },
+});
 
 export const addToBook = mutation({
   args: { recipeId: v.id("recipes") },

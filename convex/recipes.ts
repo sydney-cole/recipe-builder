@@ -188,6 +188,19 @@ export const listBook = query({
   },
 });
 
+export const savedIds = query({
+  args: {},
+  returns: v.array(v.id("recipes")),
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    const saved = await ctx.db
+      .query("savedRecipes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(200);
+    return saved.map((item) => item.recipeId);
+  },
+});
+
 export const current = query({
   args: {},
   returns: v.union(v.null(), recipeValidator),

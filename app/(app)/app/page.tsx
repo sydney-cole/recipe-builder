@@ -42,7 +42,9 @@ const quickActions = [
 
 export default function DashboardPage() {
   const convexRecipes = useQuery(api.recipes.listRecent);
-  const recipes: Recipe[] | undefined = convexRecipes?.slice(0, 3).map(
+  const savedRecipeIds = useQuery(api.recipes.savedIds);
+  const savedIdSet = savedRecipeIds === undefined ? undefined : new Set(savedRecipeIds);
+  const recipes: Array<Recipe & { isSaved: boolean }> | undefined = convexRecipes === undefined || savedIdSet === undefined ? undefined : convexRecipes.slice(0, 3).map(
     (recipe) => ({
       id: recipe._id,
       title: recipe.title,
@@ -54,6 +56,7 @@ export default function DashboardPage() {
       tags: recipe.categories.slice(0, 3),
       art: recipeArt(recipe.title),
       imageUrl: recipe.imageUrl,
+      isSaved: savedIdSet.has(recipe._id),
     }),
   );
 
@@ -120,7 +123,8 @@ export default function DashboardPage() {
               <RecipeCard
                 key={recipe.id}
                 recipe={recipe}
-                suggested
+                suggested={!recipe.isSaved}
+                canCreateGroceryList={recipe.isSaved}
               />
             ))}
           </div>

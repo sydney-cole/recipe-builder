@@ -7,7 +7,17 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
-export function CurrentRecipeButton({ recipeId, size = "sm" }: { recipeId: string; size?: "sm" | "default" }) {
+export function CurrentRecipeButton({
+  recipeId,
+  size = "sm",
+  variant,
+  className,
+}: {
+  recipeId: string;
+  size?: "sm" | "default";
+  variant?: "default" | "secondary" | "ghost";
+  className?: string;
+}) {
   const currentId = useQuery(api.recipes.currentId);
   const setCurrent = useMutation(api.recipeCards.setCurrent);
   const [isSetting, setIsSetting] = useState(false);
@@ -27,8 +37,8 @@ export function CurrentRecipeButton({ recipeId, size = "sm" }: { recipeId: strin
   }
 
   return (
-    <div>
-      <Button size={size} variant={isCurrent ? "secondary" : "default"} disabled={isCurrent || isSetting || currentId === undefined} onClick={() => void select()}>
+    <div className={className}>
+      <Button className="w-full" size={size} variant={isCurrent ? "secondary" : (variant ?? "default")} disabled={isCurrent || isSetting || currentId === undefined} onClick={() => void select()}>
         {isCurrent ? <Check size={16} /> : <CookingPot size={16} />}
         {isCurrent ? "Current recipe" : isSetting ? "Setting…" : "Set as current"}
       </Button>

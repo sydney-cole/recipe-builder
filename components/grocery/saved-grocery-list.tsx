@@ -29,7 +29,7 @@ export function SavedGroceryList({ listId }: { listId: string }) {
     quantity: item.quantityText ?? item.quantity?.toString() ?? "",
     unit: item.unit ?? "",
     category: item.category ?? "Other",
-    source: data.list.sourceRecipeTitle,
+    source: data.itemSources?.find((source) => source.itemId === item._id)?.recipeTitles.join(", ") || undefined,
     checked: item.isChecked,
   }));
 

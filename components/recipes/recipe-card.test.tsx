@@ -25,12 +25,13 @@ const recipe: Recipe = {
 describe("RecipeCard", () => {
   beforeEach(() => mocks.addToBook.mockReset().mockResolvedValue(null));
   it("links persisted recipes to details and grocery planning", () => {
-    render(<RecipeCard recipe={recipe} />);
+    render(<RecipeCard recipe={recipe} canCreateGroceryList />);
     expect(screen.getAllByRole("link", { name: /Green Orzo/ })[0]).toHaveAttribute(
       "href",
       "/app/recipe-book/orzo",
     );
-    expect(screen.getByRole("button", { name: "Create list" })).toBeDisabled();
+    expect(screen.getByText("In Recipe Book")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to grocery list" })).toBeEnabled();
   });
 
   it("does not create broken detail links for preview cards", async () => {
@@ -40,9 +41,9 @@ describe("RecipeCard", () => {
 
     const save = screen.getByRole("button", { name: "Add to Recipe Book" });
     await user.click(save);
-    expect(screen.getByRole("button", { name: "In Recipe Book" })).toBeDisabled();
+    expect(screen.getByText("In Recipe Book")).toBeInTheDocument();
     expect(mocks.addToBook).toHaveBeenCalledWith({ recipeId: "orzo" });
-    expect(screen.getByRole("button", { name: "Create list" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Add to grocery list" })).toBeEnabled();
   });
 
   it("shows a stored meal image and falls back to the default art if it fails", () => {
