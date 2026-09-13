@@ -99,6 +99,7 @@ function RecipePreviewModal({ recipeId, onClose }: { recipeId: Id<"recipes">; on
 
 export function RecipeImportNotifications() {
   const imports = useQuery(api.email.recentImports);
+  const user = useQuery(api.users.current);
   const [trackedIds, setTrackedIds] = useState<string[]>([]);
   const [previewRecipeId, setPreviewRecipeId] = useState<Id<"recipes"> | null>(null);
   const [manualImportId, setManualImportId] = useState<string | null>(null);
@@ -141,7 +142,17 @@ export function RecipeImportNotifications() {
     }
   }, [imports]);
 
-  const trackedImports = trackedIds.map((id) => imports?.find((item) => item._id === id)).filter(Boolean);
+  const preferences = user?.notificationPreferences;
+  const trackedImports = trackedIds
+    .map((id) => imports?.find((item) => item._id === id))
+    .filter((item) => {
+      if (!item) return false;
+      if (item.status === "completed") return preferences?.recipeImportReady ?? true;
+      if (item.status === "needs_review" || item.status === "failed") {
+        return preferences?.importNeedsReview ?? true;
+      }
+      return true;
+    });
 
   return (
     <>

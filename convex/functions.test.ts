@@ -215,6 +215,44 @@ describe("email functions", () => {
   });
 });
 
+describe("user settings", () => {
+  it("requires authentication and saves normalized profile settings", async () => {
+    const t = initTest();
+    await expect(t.mutation(api.users.updateProfile, { name: "Ada" })).rejects.toThrow(
+      /Unauthenticated/,
+    );
+
+    const userId = await createUser(t, "Original");
+    const asUser = t.withIdentity({ subject: userId });
+    await asUser.mutation(api.users.updateProfile, { name: "  Ada Byron  " });
+    await asUser.mutation(api.users.updateNotificationPreferences, {
+      preferences: {
+        recipeImportReady: false,
+        importNeedsReview: true,
+        subscriptionNeedsAttention: false,
+      },
+    });
+
+    expect(await asUser.query(api.users.current)).toMatchObject({
+      name: "Ada Byron",
+      email: "original@example.com",
+      notificationPreferences: {
+        recipeImportReady: false,
+        importNeedsReview: true,
+        subscriptionNeedsAttention: false,
+      },
+    });
+  });
+
+  it("rejects blank profile names", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "Original");
+    await expect(
+      t.withIdentity({ subject: userId }).mutation(api.users.updateProfile, { name: "   " }),
+    ).rejects.toThrow(/Name is required/);
+  });
+});
+
 describe("recipe authorization", () => {
   it("only returns public, imported, or explicitly saved recipes", async () => {
     const t = initTest();

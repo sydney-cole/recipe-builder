@@ -34,6 +34,13 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     avatarUrl: v.optional(v.string()),
     currentRecipeId: v.optional(v.id("recipes")),
+    notificationPreferences: v.optional(
+      v.object({
+        recipeImportReady: v.boolean(),
+        importNeedsReview: v.boolean(),
+        subscriptionNeedsAttention: v.boolean(),
+      }),
+    ),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   })
