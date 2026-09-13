@@ -11,11 +11,87 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { safeAppRedirect } from "@/lib/navigation";
 
+type AuthErrorMessage = {
+  title: string;
+  description: string;
+};
+
+export function getAuthErrorMessage(
+  caughtError: unknown,
+  mode: "sign-in" | "sign-up",
+): AuthErrorMessage {
+  const message = caughtError instanceof Error ? caughtError.message : "";
+  const normalizedMessage = message.toLowerCase();
+
+  if (normalizedMessage.includes("invalidaccountid")) {
+    return {
+      title: "Account not found",
+      description:
+        "We couldn’t find an account with that email. Check the address or create a new account.",
+    };
+  }
+
+  if (normalizedMessage.includes("invalidsecret")) {
+    return {
+      title: "Incorrect password",
+      description: "That password isn’t correct. Check it and try again.",
+    };
+  }
+
+  if (normalizedMessage.includes("toomanyfailedattempts")) {
+    return {
+      title: "Too many sign-in attempts",
+      description:
+        "Sign-in is temporarily locked for this account. Wait a little while, then try again.",
+    };
+  }
+
+  if (normalizedMessage.includes("already exists")) {
+    return {
+      title: "Account already exists",
+      description:
+        "An account with this email already exists. Sign in instead, or use a different email.",
+    };
+  }
+
+  if (normalizedMessage.includes("invalid password")) {
+    return {
+      title: "Password doesn’t meet the requirements",
+      description: "Choose a password with at least 8 characters.",
+    };
+  }
+
+  // Older Convex Auth versions combine an unknown email and a wrong password
+  // into one error, so avoid claiming which field was incorrect in this case.
+  if (normalizedMessage.includes("invalid credentials")) {
+    return {
+      title: "Email or password is incorrect",
+      description: "Check your email and password, then try again.",
+    };
+  }
+
+  if (
+    normalizedMessage.includes("failed to fetch") ||
+    normalizedMessage.includes("networkerror") ||
+    normalizedMessage.includes("network error")
+  ) {
+    return {
+      title: "Connection problem",
+      description: "Check your internet connection and try again.",
+    };
+  }
+
+  return {
+    title: mode === "sign-up" ? "Couldn’t create your account" : "Couldn’t sign you in",
+    description: "We couldn’t complete that request. Please try again.",
+  };
+}
+
 export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   const { signIn } = useAuthActions();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthErrorMessage | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSignUp = mode === "sign-up";
 
@@ -36,15 +112,7 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
       router.replace(safeAppRedirect(searchParams.get("next")));
       router.refresh();
     } catch (caughtError) {
-      const message =
-        caughtError instanceof Error ? caughtError.message : "Something went wrong.";
-      setError(
-        message.includes("Invalid credentials")
-          ? "The email or password is incorrect."
-          : message.includes("already exists")
-            ? "An account with this email already exists."
-            : "We couldn’t complete that request. Please try again.",
-      );
+      setError(getAuthErrorMessage(caughtError, mode));
       setIsSubmitting(false);
     }
   }
@@ -82,8 +150,8 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
 
           {error && (
             <Alert className="mt-6 border-red-200 bg-red-50" role="alert">
-              <AlertTitle>Couldn&apos;t {isSignUp ? "create your account" : "sign you in"}</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertTitle>{error.title}</AlertTitle>
+              <AlertDescription>{error.description}</AlertDescription>
             </Alert>
           )}
 

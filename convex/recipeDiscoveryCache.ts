@@ -1,7 +1,9 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 
-const RECOMMENDATIONS_KEY = "daily_recommendations";
+// Bump the key when recommendation eligibility changes so stale candidates
+// that were never importability-checked are replaced immediately.
+const RECOMMENDATIONS_KEY = "daily_recommendations_v2";
 const DAILY_CACHE_MS = 24 * 60 * 60 * 1_000;
 
 const discoveryResultValidator = v.object({

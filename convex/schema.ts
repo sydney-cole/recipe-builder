@@ -33,6 +33,7 @@ export default defineSchema({
     phoneVerificationTime: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     avatarUrl: v.optional(v.string()),
+    currentRecipeId: v.optional(v.id("recipes")),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   })
@@ -65,6 +66,7 @@ export default defineSchema({
       ),
     ),
     sourceQuery: v.optional(v.string()),
+    setAsCurrent: v.optional(v.boolean()),
     status: importStatus,
     attemptCount: v.number(),
     workflowId: v.optional(v.string()),

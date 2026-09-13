@@ -1,8 +1,15 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipeCard } from "./recipe-card";
 import type { Recipe } from "@/lib/data/types";
+
+const mocks = vi.hoisted(() => ({ addToBook: vi.fn() }));
+vi.mock("convex/react", () => ({
+  useMutation: () => mocks.addToBook,
+  useQuery: () => null,
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const recipe: Recipe = {
   id: "orzo",
@@ -16,6 +23,7 @@ const recipe: Recipe = {
 };
 
 describe("RecipeCard", () => {
+  beforeEach(() => mocks.addToBook.mockReset().mockResolvedValue(null));
   it("links persisted recipes to details and grocery planning", () => {
     render(<RecipeCard recipe={recipe} />);
     expect(screen.getAllByRole("link", { name: /Green Orzo/ })[0]).toHaveAttribute(
@@ -33,6 +41,8 @@ describe("RecipeCard", () => {
     const save = screen.getByRole("button", { name: "Add to Recipe Book" });
     await user.click(save);
     expect(screen.getByRole("button", { name: "In Recipe Book" })).toBeDisabled();
+    expect(mocks.addToBook).toHaveBeenCalledWith({ recipeId: "orzo" });
+    expect(screen.getByRole("button", { name: "Create list" })).toBeEnabled();
   });
 
   it("shows a stored meal image and falls back to the default art if it fails", () => {

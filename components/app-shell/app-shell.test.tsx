@@ -14,6 +14,11 @@ vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signOut: mocks.signOut }),
 }));
 
+vi.mock("convex/react", () => ({
+  useQuery: () => [],
+  useMutation: () => vi.fn(),
+}));
+
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
   useRouter: () => ({ refresh: mocks.refresh, replace: mocks.replace }),

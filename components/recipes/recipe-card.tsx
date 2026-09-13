@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { BookCheck, BookPlus, Clock3, ShoppingBasket, Users } from "lucide-react";
@@ -9,6 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AddRecipeToListButton } from "@/components/grocery/add-recipe-to-list-button";
 import { FoodArt } from "./food-art";
 import type { Recipe } from "@/lib/data/types";
+import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/convex/_generated/api";
+import { CurrentRecipeButton } from "./current-recipe-button";
 
 export function RecipeCard({
   recipe,
@@ -22,6 +26,23 @@ export function RecipeCard({
   canCreateGroceryList?: boolean;
 }) {
   const [saved, setSaved] = useState(!suggested);
+  const [saveError, setSaveError] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const addToBook = useMutation(api.recipeCards.addToBook);
+
+  async function save() {
+    setIsSaving(true);
+    setSaveError(false);
+    try {
+      await addToBook({ recipeId: recipe.id as Id<"recipes"> });
+      setSaved(true);
+    } catch {
+      setSaveError(true);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <Card className="recipe-card">
       {detailsHref ? (
@@ -44,10 +65,10 @@ export function RecipeCard({
         {recipe.missingIngredients && <p className="text-xs text-muted-foreground">Missing: {recipe.missingIngredients.join(", ")}</p>}
         <div className="cluster">{recipe.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Button variant={saved ? "secondary" : "default"} size="sm" onClick={() => setSaved(true)} disabled={saved}>
-            {saved ? <BookCheck size={16} /> : <BookPlus size={16} />}{saved ? "In Recipe Book" : "Add to Recipe Book"}
+          <Button variant={saved ? "secondary" : "default"} size="sm" onClick={() => void save()} disabled={saved || isSaving}>
+            {saved ? <BookCheck size={16} /> : <BookPlus size={16} />}{saved ? "In Recipe Book" : isSaving ? "Adding…" : "Add to Recipe Book"}
           </Button>
-          {canCreateGroceryList ? (
+          {canCreateGroceryList || (suggested && saved) ? (
             <AddRecipeToListButton recipeId={recipe.id} size="sm" />
           ) : (
             <Button
@@ -61,6 +82,8 @@ export function RecipeCard({
             </Button>
           )}
         </div>
+        <CurrentRecipeButton recipeId={recipe.id} />
+        {saveError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t add this recipe to your book. Try again.</p>}
         <p className="text-xs text-muted-foreground">Source: {recipe.source}</p>
       </CardContent>
     </Card>

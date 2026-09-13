@@ -72,6 +72,7 @@ type QueueRecipeSourceArgs = {
   sourceUrl: string;
   sourceKind: "direct" | "email" | "agent_discovery";
   sourceQuery?: string;
+  setAsCurrent?: boolean;
   sourceMessageId?: string;
   sourceEventId?: string;
   sourceSubject?: string;
@@ -94,6 +95,19 @@ export async function queueRecipeSource(
     )
     .first();
   if (existing !== null) {
+    if (args.setAsCurrent) {
+      if (existing.recipeId !== undefined) {
+        await ctx.db.patch(args.userId, {
+          currentRecipeId: existing.recipeId,
+          updatedAt: Date.now(),
+        });
+      } else if (existing.setAsCurrent !== true) {
+        await ctx.db.patch(existing._id, {
+          setAsCurrent: true,
+          updatedAt: Date.now(),
+        });
+      }
+    }
     if (existing.status === "failed" || existing.workflowId === undefined) {
       const workflowId = await startRecipeIngestion(ctx, existing._id);
       await ctx.db.patch(existing._id, {
@@ -115,6 +129,7 @@ export async function queueRecipeSource(
     normalizedUrl,
     sourceKind: args.sourceKind,
     sourceQuery: args.sourceQuery?.trim().slice(0, 500) || undefined,
+    setAsCurrent: args.setAsCurrent,
     sourceMessageId: boundedMetadata(args.sourceMessageId, 500),
     sourceEventId: boundedMetadata(args.sourceEventId, 500),
     sourceSubject: boundedMetadata(args.sourceSubject, 1_000),
@@ -151,9 +166,10 @@ export const queueDiscoveredUrl = mutation({
   args: {
     sourceUrl: v.string(),
     sourceQuery: v.string(),
+    setAsCurrent: v.optional(v.boolean()),
   },
   returns: v.id("recipeImports"),
-  handler: async (ctx, { sourceUrl, sourceQuery }) => {
+  handler: async (ctx, { sourceUrl, sourceQuery, setAsCurrent }) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Unauthenticated");
     const normalizedQuery = sourceQuery.trim();
@@ -164,6 +180,7 @@ export const queueDiscoveredUrl = mutation({
       userId,
       sourceUrl,
       sourceQuery: normalizedQuery,
+      setAsCurrent,
       sourceKind: "agent_discovery",
     });
     return queued.importId;

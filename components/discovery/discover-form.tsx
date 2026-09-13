@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useMutation } from "convex/react";
-import { BookPlus, Clock3, ExternalLink, Search, Sparkles, Star, X } from "lucide-react";
+import { BookPlus, Clock3, CookingPot, ExternalLink, Search, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { RecipeLinkImport } from "@/components/discovery/recipe-link-import";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
+import { announceRecipeImport } from "@/lib/recipe-import-events";
 
 const starters = ["chicken thighs", "broccoli", "cozy", "30-minute dinner"];
 const MAX_VISIBLE_TERMS = 6;
@@ -44,6 +45,7 @@ export function DiscoverForm() {
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
+  const [selectionIntent, setSelectionIntent] = useState<"create" | "current" | null>(null);
   const [detailRecipe, setDetailRecipe] = useState<DiscoveryRecipe | null>(null);
   const [selectionMessage, setSelectionMessage] = useState("");
   const [error, setError] = useState("");
@@ -121,18 +123,24 @@ export function DiscoverForm() {
     }
   }
 
-  async function selectRecipe(recipe: DiscoveryRecipe) {
+  async function selectRecipe(recipe: DiscoveryRecipe, setAsCurrent = false) {
     setError("");
     setSelectedUrl(recipe.url);
+    setSelectionIntent(setAsCurrent ? "current" : "create");
     try {
-      await queueRecipe({
+      const importId = await queueRecipe({
         sourceUrl: recipe.url,
         sourceQuery: terms.length > 0 ? terms.join(", ") : "recommended recipes",
+        ...(setAsCurrent ? { setAsCurrent: true } : {}),
       });
-      setSelectionMessage(`${recipe.title} is queued. It will appear in your Recipe Book when it is ready.`);
+      announceRecipeImport(importId);
+      setSelectionMessage(setAsCurrent
+        ? `${recipe.title} is being created and will become your current recipe when it’s ready.`
+        : `${recipe.title} is queued. We’ll let you know when the card is ready to view.`);
       setDetailRecipe(null);
     } catch {
       setSelectedUrl(null);
+      setSelectionIntent(null);
       setError("We found that recipe, but couldn’t start its import. Try again.");
     }
   }
@@ -276,7 +284,11 @@ export function DiscoverForm() {
             <div className="mt-6 cluster">
               <Button onClick={() => selectRecipe(detailRecipe)} disabled={selectedUrl !== null}>
                 <BookPlus size={16} />
-                {selectedUrl === detailRecipe.url ? "Starting import…" : "Add to Recipe Book"}
+                {selectedUrl === detailRecipe.url && selectionIntent === "create" ? "Creating card…" : "Create recipe card"}
+              </Button>
+              <Button variant="secondary" onClick={() => selectRecipe(detailRecipe, true)} disabled={selectedUrl !== null}>
+                <CookingPot size={16} />
+                {selectedUrl === detailRecipe.url && selectionIntent === "current" ? "Setting up…" : "Set as current"}
               </Button>
               <Button asChild variant="secondary">
                 <a href={detailRecipe.url} target="_blank" rel="noreferrer"><ExternalLink size={16} />View original</a>

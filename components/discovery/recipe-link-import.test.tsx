@@ -28,7 +28,7 @@ describe("RecipeLinkImport", () => {
       sourceUrl: "https://example.com/favorite-recipe",
     }));
     expect(input).toHaveValue("");
-    expect(screen.getByRole("status")).toHaveTextContent("Recipe Book");
+    expect(screen.getByRole("status")).toHaveTextContent("ready to view");
   });
 
   it("shows a useful error when the recipe cannot be queued", async () => {

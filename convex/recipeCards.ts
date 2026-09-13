@@ -58,6 +58,59 @@ function normalizeIngredientName(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+export const addToBook = mutation({
+  args: { recipeId: v.id("recipes") },
+  returns: v.null(),
+  handler: async (ctx, { recipeId }) => {
+    const userId = await requireUser(ctx);
+    const recipe = await ctx.db.get(recipeId);
+    if (recipe === null || recipe.deletedAt !== undefined) {
+      throw new Error("Recipe was not found");
+    }
+    if (recipe.isPublic !== true) {
+      await requireOwnedRecipe(ctx, userId, recipeId);
+    }
+    const existing = await ctx.db
+      .query("savedRecipes")
+      .withIndex("by_user_and_recipe", (q) =>
+        q.eq("userId", userId).eq("recipeId", recipeId),
+      )
+      .unique();
+    if (existing !== null) return null;
+    const now = Date.now();
+    await ctx.db.insert("savedRecipes", {
+      userId,
+      recipeId,
+      isFavorite: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return null;
+  },
+});
+
+export const setCurrent = mutation({
+  args: { recipeId: v.union(v.id("recipes"), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { recipeId }) => {
+    const userId = await requireUser(ctx);
+    if (recipeId !== null) {
+      const recipe = await ctx.db.get(recipeId);
+      if (recipe === null || recipe.deletedAt !== undefined) {
+        throw new Error("Recipe was not found");
+      }
+      if (recipe.isPublic !== true) {
+        await requireOwnedRecipe(ctx, userId, recipeId);
+      }
+    }
+    await ctx.db.patch(userId, {
+      currentRecipeId: recipeId ?? undefined,
+      updatedAt: Date.now(),
+    });
+    return null;
+  },
+});
+
 async function ingredientCatalogEntry(
   ctx: MutationCtx,
   name: string,
@@ -364,6 +417,10 @@ export const removeCard = mutation({
     const now = Date.now();
     if (saved !== null) await ctx.db.delete(saved._id);
     await ctx.db.patch(recipeId, { deletedAt: now, updatedAt: now });
+    const user = await ctx.db.get(userId);
+    if (user?.currentRecipeId === recipeId) {
+      await ctx.db.patch(userId, { currentRecipeId: undefined, updatedAt: now });
+    }
     return null;
   },
 });

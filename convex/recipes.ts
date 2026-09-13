@@ -147,6 +147,76 @@ export const list = query({
   },
 });
 
+export const listRecent = query({
+  args: {},
+  returns: v.array(recipeValidator),
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    const imports = await ctx.db
+      .query("recipeImports")
+      .withIndex("by_requester", (q) => q.eq("requestedBy", userId))
+      .order("desc")
+      .take(50);
+    const recipes = await Promise.all(
+      imports.flatMap((item) => item.recipeId ? [ctx.db.get(item.recipeId)] : []),
+    );
+    return await Promise.all(
+      recipes
+        .filter((recipe): recipe is Doc<"recipes"> => recipe !== null && recipe.deletedAt === undefined)
+        .slice(0, 3)
+        .map((recipe) => recipeView(ctx, recipe)),
+    );
+  },
+});
+
+export const listBook = query({
+  args: {},
+  returns: v.array(recipeValidator),
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    const saved = await ctx.db
+      .query("savedRecipes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(200);
+    const recipes = await Promise.all(saved.map((item) => ctx.db.get(item.recipeId)));
+    return await Promise.all(
+      recipes
+        .filter((recipe): recipe is Doc<"recipes"> => recipe !== null && recipe.deletedAt === undefined)
+        .map((recipe) => recipeView(ctx, recipe)),
+    );
+  },
+});
+
+export const current = query({
+  args: {},
+  returns: v.union(v.null(), recipeValidator),
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    const user = await ctx.db.get(userId);
+    if (user?.currentRecipeId === undefined) return null;
+    const recipe = await ctx.db.get(user.currentRecipeId);
+    if (
+      recipe === null ||
+      recipe.deletedAt !== undefined ||
+      !(await canAccessRecipe(ctx, userId, recipe))
+    ) {
+      return null;
+    }
+    return await recipeView(ctx, recipe);
+  },
+});
+
+export const currentId = query({
+  args: {},
+  returns: v.union(v.null(), v.id("recipes")),
+  handler: async (ctx) => {
+    const userId = await requireUser(ctx);
+    const user = await ctx.db.get(userId);
+    return user?.currentRecipeId ?? null;
+  },
+});
+
 async function canAccessRecipe(
   ctx: QueryCtx,
   userId: Id<"users">,

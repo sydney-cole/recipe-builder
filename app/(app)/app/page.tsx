@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { RecipeCard } from "@/components/recipes/recipe-card";
+import { CurrentRecipePanel } from "@/components/recipes/current-recipe-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,7 +41,7 @@ const quickActions = [
 ];
 
 export default function DashboardPage() {
-  const convexRecipes = useQuery(api.recipes.list);
+  const convexRecipes = useQuery(api.recipes.listRecent);
   const recipes: Recipe[] | undefined = convexRecipes?.slice(0, 3).map(
     (recipe) => ({
       id: recipe._id,
@@ -63,8 +64,9 @@ export default function DashboardPage() {
         title="What are we cooking?"
         description="Your kitchen command center for saved recipes and grocery planning."
       />
+      <CurrentRecipePanel />
       <section
-        className="grid gap-4 md:grid-cols-3"
+        className="mt-8 grid gap-4 md:grid-cols-3"
         aria-label="Quick actions"
       >
         {quickActions.map(({ href, icon: Icon, label, detail }) => (
@@ -84,9 +86,9 @@ export default function DashboardPage() {
       <section className="mt-10">
         <div className="section-row">
           <div>
-            <h2 className="section-heading">Recently saved</h2>
+            <h2 className="section-heading">Recent recipes</h2>
             <p className="section-copy">
-              Your newest recipes, ready to become grocery lists.
+              Your newest recipe cards, whether or not they’re in your Recipe Book.
             </p>
           </div>
           <Button asChild variant="ghost">
@@ -106,7 +108,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="p-8 text-center">
               <BookOpen className="mx-auto text-muted-foreground" />
-              <p className="mt-3 font-extrabold">No saved recipes yet</p>
+              <p className="mt-3 font-extrabold">No recent recipes yet</p>
               <Button asChild className="mt-4" size="sm">
                 <Link href="/app/discover">Import a recipe</Link>
               </Button>
@@ -118,7 +120,7 @@ export default function DashboardPage() {
               <RecipeCard
                 key={recipe.id}
                 recipe={recipe}
-                canCreateGroceryList
+                suggested
               />
             ))}
           </div>

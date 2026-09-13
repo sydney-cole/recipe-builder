@@ -49,7 +49,8 @@ describe("DiscoverForm", () => {
 
     expect(screen.getByRole("dialog")).toHaveTextContent("1 pound chicken thighs");
     expect(screen.getByRole("dialog")).toHaveTextContent("Cook until golden and finish with lemon.");
-    expect(screen.getByRole("button", { name: "Add to Recipe Book" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create recipe card" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Set as current" })).toBeInTheDocument();
   });
 
   it("explains that live recommendations are loading", () => {
@@ -119,8 +120,22 @@ describe("DiscoverForm", () => {
     await user.click(screen.getByRole("button", { name: "chicken thighs" }));
     await user.click(screen.getByRole("button", { name: "Find recipes" }));
     await user.click(await screen.findByRole("button", { name: "View recipe" }));
-    await user.click(screen.getByRole("button", { name: "Add to Recipe Book" }));
+    await user.click(screen.getByRole("button", { name: "Create recipe card" }));
     expect(mocks.queue).toHaveBeenCalledWith({ sourceUrl: result.url, sourceQuery: "chicken thighs" });
     expect(await screen.findByRole("status")).toHaveTextContent("Lemon chicken is queued");
+  });
+
+  it("can make a recommendation current after its card is created", async () => {
+    const user = userEvent.setup();
+    render(<DiscoverForm />);
+    await user.click(await screen.findByRole("button", { name: "View recipe" }));
+    await user.click(screen.getByRole("button", { name: "Set as current" }));
+
+    expect(mocks.queue).toHaveBeenCalledWith({
+      sourceUrl: result.url,
+      sourceQuery: "recommended recipes",
+      setAsCurrent: true,
+    });
+    expect(await screen.findByRole("status")).toHaveTextContent("will become your current recipe");
   });
 });

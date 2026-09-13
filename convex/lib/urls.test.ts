@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isPublicUrlHostname,
+  isLikelyIndividualRecipePage,
   normalizeRecipeUrl,
   recipeLinksFromMessage,
 } from "./urls";
@@ -48,6 +49,23 @@ describe("normalizeRecipeUrl", () => {
     expect(normalizeRecipeUrl("https://recipes.example.com./dinner")).toBe(
       "https://recipes.example.com./dinner",
     );
+  });
+});
+
+describe("isLikelyIndividualRecipePage", () => {
+  it.each([
+    ["https://example.com/collection/our-best-recipes/", "Our best recipes"],
+    ["https://example.com/25-most-popular-recipes-of-2025/", "25 Most Popular Recipes"],
+    ["https://example.com/category/dinner/", "Dinner recipes"],
+  ])("rejects roundup and listing pages: %s", (url, title) => {
+    expect(isLikelyIndividualRecipePage(url, title)).toBe(false);
+  });
+
+  it.each([
+    ["https://example.com/recipes/chicken-parmesan/", "Chicken Parmesan"],
+    ["https://example.com/best-chocolate-chip-cookies/", "Best Chocolate Chip Cookies"],
+  ])("allows plausible individual recipe pages: %s", (url, title) => {
+    expect(isLikelyIndividualRecipePage(url, title)).toBe(true);
   });
 });
 

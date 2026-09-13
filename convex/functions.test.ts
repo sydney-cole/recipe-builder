@@ -247,6 +247,18 @@ describe("recipe authorization", () => {
       recipe: { _id: adaPrivateId },
       ingredients: [],
     });
+
+    await asAda.mutation(api.recipeCards.setCurrent, { recipeId: adaPrivateId });
+    expect(await asAda.query(api.recipes.currentId)).toBe(adaPrivateId);
+    expect(await asAda.query(api.recipes.current)).toMatchObject({
+      _id: adaPrivateId,
+      title: "ada-private",
+    });
+    await expect(
+      asAda.mutation(api.recipeCards.setCurrent, { recipeId: gracePrivateId }),
+    ).rejects.toThrow(/Forbidden/);
+    await asAda.mutation(api.recipeCards.setCurrent, { recipeId: null });
+    expect(await asAda.query(api.recipes.current)).toBeNull();
   });
 
   it("rejects anonymous access", async () => {
@@ -469,10 +481,21 @@ describe("agent-generated recipe persistence", () => {
       });
       expect(recipeIngredients).toHaveLength(2);
       expect(groceryLists).toHaveLength(0);
-      expect(saved?.userId).toBe(userId);
+      expect(saved).toBeNull();
     });
 
     const asUser = t.withIdentity({ subject: userId });
+    await asUser.mutation(api.recipeCards.addToBook, { recipeId: first.recipeId });
+    await asUser.mutation(api.recipeCards.addToBook, { recipeId: first.recipeId });
+    await t.run(async (ctx) => {
+      const saved = await ctx.db
+        .query("savedRecipes")
+        .withIndex("by_user_and_recipe", (q) =>
+          q.eq("userId", userId).eq("recipeId", first.recipeId),
+        )
+        .collect();
+      expect(saved).toHaveLength(1);
+    });
     await expect(
       t.mutation(api.groceryLists.createFromRecipe, {
         recipeId: first.recipeId,

@@ -16,7 +16,7 @@ import type { Recipe } from "@/lib/data/types";
 import { filterAndSortRecipes, type RecipeSort } from "@/lib/recipes";
 
 export default function RecipeBookPage() {
-  const convexRecipes = useQuery(api.recipes.list);
+  const convexRecipes = useQuery(api.recipes.listBook);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<RecipeSort>("recent");
 
@@ -42,7 +42,7 @@ export default function RecipeBookPage() {
       <PageHeader
         eyebrow="Your collection"
         title="Recipe Book"
-        description="Every recipe you save or approve after import lives here."
+        description="Every recipe you choose to save lives here."
         actions={<Button asChild><Link href="/app/discover">Import recipe</Link></Button>}
       />
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">

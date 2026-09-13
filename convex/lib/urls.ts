@@ -54,6 +54,36 @@ export function normalizeRecipeUrl(value: string) {
   return url.toString();
 }
 
+/**
+ * Reject obvious roundup, category, and search pages before presenting a URL
+ * as an importable recipe. This is intentionally conservative: extraction is
+ * still responsible for proving that accepted pages contain a full recipe.
+ */
+export function isLikelyIndividualRecipePage(value: string, title = "") {
+  let pathname: string;
+  try {
+    pathname = new URL(value).pathname.toLowerCase();
+  } catch {
+    return false;
+  }
+
+  const decodedPath = decodeURIComponent(pathname);
+  const normalizedTitle = title.trim().toLowerCase();
+  if (
+    /\/(?:collections?|categor(?:y|ies)|tags?|search)(?:\/|$)/.test(decodedPath) ||
+    /\/(?:recipe-)?roundups?(?:\/|$)/.test(decodedPath) ||
+    /\/(?:\d+|our)-[^/]*recipes?[^/]*(?:\/|$)/.test(decodedPath)
+  ) {
+    return false;
+  }
+
+  return !(
+    /\b(?:collection|roundup)\b/.test(normalizedTitle) ||
+    /\b\d+\s+(?:of\s+)?(?:our\s+)?[^|:]*\brecipes\b/.test(normalizedTitle) ||
+    /\bour\s+most\s+[^|:]*\brecipes\b/.test(normalizedTitle)
+  );
+}
+
 function stringField(value: unknown, key: string) {
   if (typeof value !== "object" || value === null) return undefined;
   const field = (value as Record<string, unknown>)[key];

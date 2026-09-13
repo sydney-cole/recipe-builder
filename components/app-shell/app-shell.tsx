@@ -8,6 +8,7 @@ import { BookOpen, Compass, Home, Inbox, ListChecks, Settings } from "lucide-rea
 import { Brand } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { RecipeImportNotifications } from "@/components/recipes/recipe-import-notifications";
 
 const primary = [
   { href: "/app", label: "Home", icon: Home, exact: true },
@@ -79,6 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {primary.map((item) => <NavItem key={item.href} item={item} mobile />)}
       </nav>
+      <RecipeImportNotifications />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api } from "@/convex/_generated/api";
+import { announceRecipeImport } from "@/lib/recipe-import-events";
 
 export function RecipeLinkImport() {
   const queueUrl = useMutation(api.email.queueUrl);
@@ -22,9 +23,10 @@ export function RecipeLinkImport() {
     setMessage("");
     setIsQueueing(true);
     try {
-      await queueUrl({ sourceUrl: url.trim() });
+      const importId = await queueUrl({ sourceUrl: url.trim() });
+      announceRecipeImport(importId);
       setUrl("");
-      setMessage("Recipe link queued. It will appear in your Recipe Book when it is ready.");
+      setMessage("Recipe link queued. We’ll let you know when the card is ready to view.");
     } catch {
       setError("We couldn’t queue that link. Check the URL and try again.");
     } finally {

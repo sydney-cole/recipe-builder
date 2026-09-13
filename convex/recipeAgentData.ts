@@ -171,13 +171,12 @@ export const persistGeneratedRecipe = internalMutation({
       updatedAt: now,
     });
 
-    await ctx.db.insert("savedRecipes", {
-      userId: recipeImport.requestedBy,
-      recipeId,
-      isFavorite: false,
-      createdAt: now,
-      updatedAt: now,
-    });
+    if (recipeImport.setAsCurrent === true) {
+      await ctx.db.patch(recipeImport.requestedBy, {
+        currentRecipeId: recipeId,
+        updatedAt: now,
+      });
+    }
 
     for (const [index, ingredient] of extraction.ingredients.entries()) {
       const normalizedName =

@@ -53,4 +53,58 @@ describe("AuthForm", () => {
     );
     expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
   });
+
+  it.each([
+    [
+      "InvalidAccountId",
+      "Account not found",
+      "We couldn’t find an account with that email. Check the address or create a new account.",
+    ],
+    [
+      "InvalidSecret",
+      "Incorrect password",
+      "That password isn’t correct. Check it and try again.",
+    ],
+    [
+      "TooManyFailedAttempts",
+      "Too many sign-in attempts",
+      "Sign-in is temporarily locked for this account. Wait a little while, then try again.",
+    ],
+    [
+      "Invalid credentials",
+      "Email or password is incorrect",
+      "Check your email and password, then try again.",
+    ],
+  ])("shows a specific sign-in message for %s", async (backendError, title, description) => {
+    mocks.signIn.mockRejectedValue(new Error(`[CONVEX] Uncaught Error: ${backendError}`));
+    const user = userEvent.setup();
+    render(<AuthForm mode="sign-in" />);
+
+    await user.type(screen.getByLabelText("Email"), "cook@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(title);
+    expect(alert).toHaveTextContent(description);
+  });
+
+  it("explains when a sign-up email already has an account", async () => {
+    mocks.signIn.mockRejectedValue(
+      new Error("Account cook@example.com already exists"),
+    );
+    const user = userEvent.setup();
+    render(<AuthForm mode="sign-up" />);
+
+    await user.type(screen.getByLabelText("Name"), "Home Cook");
+    await user.type(screen.getByLabelText("Email"), "cook@example.com");
+    await user.type(screen.getByLabelText("Password"), "password123");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Account already exists");
+    expect(alert).toHaveTextContent(
+      "An account with this email already exists. Sign in instead, or use a different email.",
+    );
+  });
 });

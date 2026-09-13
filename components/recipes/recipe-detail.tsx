@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, Check, Clock3, ExternalLink, Pencil, Plus, Save, ShoppingBasket, Trash2, Users } from "lucide-react";
+import { ArrowLeft, BookCheck, BookPlus, Check, Clock3, ExternalLink, Pencil, Plus, Save, ShoppingBasket, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -16,6 +16,7 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { recipeArt, recipeTotalMinutes } from "@/lib/data/recipe-view";
 import { FoodArt } from "./food-art";
 import { RecipeIngredients } from "./recipe-ingredients";
+import { CurrentRecipeButton } from "./current-recipe-button";
 
 function optionalNumber(value: string) {
   if (!value.trim()) return null;
@@ -81,6 +82,7 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
   const setNotes = useMutation(api.recipeCards.setNotes);
   const acknowledgeReview = useMutation(api.recipeCards.acknowledgeReview);
   const removeCard = useMutation(api.recipeCards.removeCard);
+  const addToBook = useMutation(api.recipeCards.addToBook);
   const [editing, setEditing] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -161,9 +163,19 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
     setError("");
     try {
       await acknowledgeReview({ recipeId: recipeDocId });
-      setMessage("Review completed. The recipe is ready in your Recipe Book.");
+      setMessage("Review completed. Add the recipe to your book when you’re ready.");
     } catch {
       setError("We couldn’t complete the review.");
+    }
+  }
+
+  async function saveToBook() {
+    setError("");
+    try {
+      await addToBook({ recipeId: recipeDocId });
+      setMessage("Recipe added to your Recipe Book.");
+    } catch {
+      setError("We couldn’t add this recipe to your book.");
     }
   }
 
@@ -194,6 +206,8 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
           {recipe.description && <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">{recipe.description}</p>}
           {(totalMinutes !== undefined || recipe.servings !== undefined) && <div className="mt-6 cluster text-sm font-bold text-muted-foreground">{totalMinutes !== undefined && <span><Clock3 className="inline" size={17} /> {totalMinutes} min</span>}{recipe.servings !== undefined && <span><Users className="inline" size={17} /> {recipe.servings} servings</span>}</div>}
           <div className="mt-7 cluster">
+            <CurrentRecipeButton recipeId={recipe._id} size="default" />
+            {data.saved === null ? <Button onClick={() => void saveToBook()}><BookPlus size={17} />Add to Recipe Book</Button> : <Button variant="secondary" disabled><BookCheck size={17} />In Recipe Book</Button>}
             {importReview?.generatedGroceryListId ? <Button asChild><Link href={`/app/grocery-lists/${importReview.generatedGroceryListId}`}><ShoppingBasket size={17} />Open generated list</Link></Button> : <Button asChild><Link href="/app/grocery-lists"><ShoppingBasket size={17} />Open grocery lists</Link></Button>}
             <Button variant="secondary" onClick={() => setEditing((current) => !current)}><Pencil size={17} />{editing ? "Close editor" : "Edit recipe"}</Button>
             <Button asChild variant="secondary"><a href={recipe.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={17} />View original</a></Button>

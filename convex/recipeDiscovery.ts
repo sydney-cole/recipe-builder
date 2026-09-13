@@ -9,6 +9,8 @@ import { v } from "convex/values";
 import { z } from "zod";
 import { components, internal } from "./_generated/api";
 import { action } from "./_generated/server";
+import { isLikelyIndividualRecipePage } from "./lib/urls";
+import { buildRecipeScrapePayload } from "./lib/recipeScrape";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
 const DEFAULT_DIRECT_MODEL = "gpt-5-mini";
@@ -182,7 +184,7 @@ export const search = action({
       throw new Error("Add at least one ingredient, flavor, cuisine, or dish");
     }
     const query = isRecommended
-      ? "best rated popular recipes with complete ingredients and instructions"
+      ? "highly rated individual recipe page with complete ingredients and instructions -collection -roundup"
       : `best rated recipe ${normalizedTerms.join(" ")}`;
 
     if (isRecommended) {
@@ -191,21 +193,34 @@ export const search = action({
         {},
       );
       if (!dailyCache.shouldRefresh) {
+        const validCachedRecipes = dailyCache.cached?.recipes.filter((recipe) =>
+          isLikelyIndividualRecipePage(recipe.url, recipe.title),
+        );
+        if (
+          dailyCache.cached !== null &&
+          validCachedRecipes !== undefined &&
+          validCachedRecipes.length > 0 &&
+          validCachedRecipes.length === dailyCache.cached.recipes.length
+        ) {
+          return { ...dailyCache.cached, recipes: validCachedRecipes };
+        }
+        // Replace an older cache containing roundup pages immediately rather
+        // than serving it for the remainder of the 24-hour cache window.
         if (dailyCache.cached !== null && dailyCache.cached.recipes.length > 0) {
-          return dailyCache.cached;
+          // Continue into a fresh search below.
+        } else {
+          // A concurrent request may have claimed today's refresh milliseconds
+          // earlier. Wait for it instead of starting a second web scrape.
+          for (let attempt = 0; attempt < 30; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2_000));
+            const completed: DiscoveryResponse | null = await ctx.runQuery(
+              internal.recipeDiscoveryCache.getDailyRecommendations,
+              {},
+            );
+            if (completed !== null) return completed;
+          }
+          return dailyCache.cached ?? { query, recipes: [] };
         }
-
-        // A concurrent request may have claimed today's refresh milliseconds
-        // earlier. Wait for it instead of starting a second web scrape.
-        for (let attempt = 0; attempt < 30; attempt += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 2_000));
-          const completed: DiscoveryResponse | null = await ctx.runQuery(
-            internal.recipeDiscoveryCache.getDailyRecommendations,
-            {},
-          );
-          if (completed !== null) return completed;
-        }
-        return dailyCache.cached ?? { query, recipes: [] };
       }
     }
 
@@ -260,6 +275,11 @@ export const search = action({
           | undefined;
         const url = result.url ?? metadata?.sourceURL ?? metadata?.url;
         if (!validWebUrl(url)) return null;
+        const title =
+          (typeof result.title === "string" ? result.title : undefined) ??
+          metadata?.title ??
+          "Untitled recipe";
+        if (!isLikelyIndividualRecipePage(url, title)) return null;
         const markdown =
           "markdown" in result && typeof result.markdown === "string"
             ? result.markdown.slice(0, MAX_RESULT_EVIDENCE_CHARACTERS)
@@ -275,10 +295,7 @@ export const search = action({
           position:
             typeof result.position === "number" ? result.position : index + 1,
           url,
-          title:
-            (typeof result.title === "string" ? result.title : undefined) ??
-            metadata?.title ??
-            "Untitled recipe",
+          title,
           description:
             (typeof result.description === "string"
               ? result.description
@@ -388,7 +405,38 @@ ${JSON.stringify(evidence)}
           instructions: recipe.instructions,
         };
       });
-    const recipes = [...agentRecipes, ...firecrawlFallbacks].slice(0, 3);
+    const candidates = [...agentRecipes, ...firecrawlFallbacks]
+      .filter(
+        (recipe, index, all) =>
+          all.findIndex((candidate) => candidate.url === recipe.url) === index,
+      )
+      .slice(0, MAX_SEARCH_RESULTS);
+    const recipes: DiscoveryResult[] = isRecommended
+      ? (
+          await Promise.all(
+            candidates.map(async (candidate) => {
+              try {
+                // Use the same scrape shape as card creation. Search-result
+                // snippets can look complete even when the site blocks imports.
+                const document = await firecrawl.scrape(ctx, candidate.url, {
+                  formats: ["markdown", "html"],
+                  onlyMainContent: false,
+                  blockAds: true,
+                  removeBase64Images: true,
+                  maxAge: 3_600_000,
+                  timeout: 60_000,
+                });
+                buildRecipeScrapePayload(document as Record<string, unknown>);
+                return candidate;
+              } catch {
+                return null;
+              }
+            }),
+          )
+        )
+          .filter((recipe): recipe is DiscoveryResult => recipe !== null)
+          .slice(0, 3)
+      : candidates.slice(0, 3);
     if (isRecommended) {
       await ctx.runMutation(
         internal.recipeDiscoveryCache.saveDailyRecommendations,
