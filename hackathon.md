@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-11T20:24:13Z
+- **Last updated:** 2026-09-13T01:01:45Z
 
 ## Log
 
@@ -198,3 +198,15 @@ mobile navigation, and removed the duplicate Discover dinner action from Home.
 The remaining Home import action now opens Discover, where known-link imports
 live (`components/app-shell/app-shell.tsx`, `app/(app)/app/page.tsx`,
 `app/globals.css`).
+
+### 2026-09-13 - 61187f6
+Separated newly created recipe cards from the Recipe Book: realtime import
+notifications now show processing, failure, and an in-page preview, while users
+explicitly save a card or set it as the current Home recipe. Added recent-card
+status, blocked-source checks, and a manual recipe fallback. Grocery actions can
+create a list or add to an existing one, preserving comma-separated per-recipe
+ingredient provenance while parsing amounts, normalizing names, merging common
+ingredient aliases, and converting compatible volume and weight units. Hardened
+URL, image, validator, and UI boundaries with expanded tests
+(`convex/recipeCards.ts`, `convex/recipes.ts`, `convex/groceryLists.ts`,
+`convex/lib/manualIngredient.ts`, `components/recipes/`, `components/grocery/`).
