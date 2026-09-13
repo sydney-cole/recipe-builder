@@ -69,7 +69,7 @@ export function RecipeCard({
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {!saved && <Button className="w-full" size="sm" onClick={() => void save()} disabled={isSaving}><BookPlus size={16} />{isSaving ? "Adding…" : "Add to Recipe Book"}</Button>}
           <CurrentRecipeButton className="w-full" recipeId={recipe.id} variant="secondary" />
-          {(canCreateGroceryList || (suggested && saved)) && <AddRecipeToListButton className="w-full" recipeId={recipe.id} size="sm" />}
+          {(canCreateGroceryList || (suggested && saved)) && <AddRecipeToListButton className="w-full whitespace-nowrap" recipeId={recipe.id} size="sm" />}
         </div>
         {saveError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t add this recipe to your book. Try again.</p>}
         <p className="text-xs text-muted-foreground">Source: {recipe.source}</p>
