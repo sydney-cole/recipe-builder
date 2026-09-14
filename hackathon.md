@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-13T01:01:45Z
+- **Last updated:** 2026-09-14T12:41:38Z
 
 ## Log
 
@@ -210,3 +210,19 @@ ingredient aliases, and converting compatible volume and weight units. Hardened
 URL, image, validator, and UI boundaries with expanded tests
 (`convex/recipeCards.ts`, `convex/recipes.ts`, `convex/groceryLists.ts`,
 `convex/lib/manualIngredient.ts`, `components/recipes/`, `components/grocery/`).
+
+### 2026-09-14 - 51226a2
+Kept recipe selection on Discover: agent searches now present up to three
+choices in an in-page dialog, and pasted links show their processing result in
+the same page. Selecting a search result stores its already-loaded ingredients
+and instructions as a private preview without a second Firecrawl scrape; pasted
+links still use the durable importer once. The standalone preview can return
+home, save to the Recipe Book, become the current recipe, or open a new grocery
+list, whose Save action returns home (`components/discovery/`,
+`app/(app)/app/recipes/`, `convex/recipePreviews.ts`, `convex/email.ts`,
+`components/recipes/recipe-preview-actions.tsx`, `convex/groceryLists.ts`).
+Reduced explicit search evidence from eight pages to five while retaining the
+existing once-per-24-hours recommendation cache. Added authenticated backend,
+interaction, scrape, and image coverage for the merged workflow
+(`convex/recipeDiscovery.ts`, `convex/functions.test.ts`,
+`convex/lib/recipeScrape.test.ts`, `convex/recipeImages.test.ts`).
