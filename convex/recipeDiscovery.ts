@@ -16,7 +16,9 @@ const firecrawl = new FirecrawlClient(components.firecrawl);
 const DEFAULT_DIRECT_MODEL = "gpt-5-mini";
 const DEFAULT_GATEWAY_MODEL = "openai/gpt-5-mini";
 const MAX_TERMS = 10;
-const MAX_SEARCH_RESULTS = 8;
+// Five evidence pages is enough to rank at most three choices while keeping
+// Firecrawl extraction and downstream model tokens bounded.
+const MAX_SEARCH_RESULTS = 5;
 const MAX_RESULT_EVIDENCE_CHARACTERS = 8_000;
 
 type FirecrawlRecipe = {

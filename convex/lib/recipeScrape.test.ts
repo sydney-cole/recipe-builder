@@ -44,6 +44,30 @@ describe("recipe scrape artifact preparation", () => {
     ).toBe("https://example.com/images/stew.webp");
   });
 
+  it("supports recipe image arrays and metadata fallback for malformed data", () => {
+    expect(
+      extractRecipeImageUrl(
+        JSON.stringify({
+          "@type": ["Thing", "Recipe"],
+          image: [{ contentUrl: "https://cdn.example.com/array-image.jpg" }],
+        }),
+        {},
+      ),
+    ).toBe("https://cdn.example.com/array-image.jpg");
+    expect(
+      extractRecipeImageUrl("{malformed", {
+        sourceURL: "https://example.com/recipes/stew",
+        twitterImage: "/images/twitter-stew.png",
+      }),
+    ).toBe("https://example.com/images/twitter-stew.png");
+    expect(
+      extractRecipeImageUrl(
+        JSON.stringify({ "@type": "Recipe", image: "data:image/png;base64,x" }),
+        { image: "https://cdn.example.com/fallback.png" },
+      ),
+    ).toBe("https://cdn.example.com/fallback.png");
+  });
+
   it("ignores malformed and non-recipe JSON-LD", () => {
     expect(
       extractRecipeJsonLd(

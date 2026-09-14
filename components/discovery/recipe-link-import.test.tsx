@@ -3,9 +3,23 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipeLinkImport } from "./recipe-link-import";
 
-const mocks = vi.hoisted(() => ({ queueUrl: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  queueUrl: vi.fn(),
+  push: vi.fn(),
+  result: {
+    status: "completed",
+    recipeId: "recipe-123",
+    title: "Favorite recipe",
+    description: "A complete imported recipe.",
+    sourceUrl: "https://example.com/favorite-recipe",
+  },
+}));
 
-vi.mock("convex/react", () => ({ useMutation: () => mocks.queueUrl }));
+vi.mock("convex/react", () => ({
+  useMutation: () => mocks.queueUrl,
+  useQuery: () => mocks.result,
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
 
 describe("RecipeLinkImport", () => {
   beforeEach(() => {
@@ -13,7 +27,7 @@ describe("RecipeLinkImport", () => {
     mocks.queueUrl.mockResolvedValue("import-123");
   });
 
-  it("queues a pasted recipe URL and confirms where the recipe will appear", async () => {
+  it("shows a pasted recipe result and opens its unsaved preview", async () => {
     const user = userEvent.setup();
     const { container } = render(<RecipeLinkImport />);
 
@@ -28,7 +42,9 @@ describe("RecipeLinkImport", () => {
       sourceUrl: "https://example.com/favorite-recipe",
     }));
     expect(input).toHaveValue("");
-    expect(screen.getByRole("status")).toHaveTextContent("ready to view");
+    expect(screen.getByRole("dialog", { name: "Recipe result" })).toHaveTextContent("Favorite recipe");
+    await user.click(screen.getByRole("button", { name: "Choose recipe" }));
+    expect(mocks.push).toHaveBeenCalledWith("/app/recipes/recipe-123");
   });
 
   it("shows a useful error when the recipe cannot be queued", async () => {

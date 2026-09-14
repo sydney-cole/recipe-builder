@@ -1,7 +1,8 @@
 "use client";
 
 import { useAction, useMutation } from "convex/react";
-import { BookPlus, Clock3, CookingPot, ExternalLink, Search, Sparkles, Star, X } from "lucide-react";
+import { BookPlus, Clock3, ExternalLink, Search, Sparkles, Star, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { RecipeLinkImport } from "@/components/discovery/recipe-link-import";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,7 +13,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
-import { announceRecipeImport } from "@/lib/recipe-import-events";
 
 const starters = ["chicken thighs", "broccoli", "cozy", "30-minute dinner"];
 const MAX_VISIBLE_TERMS = 6;
@@ -36,20 +36,22 @@ function normalizedTerms(values: string[]) {
 }
 
 export function DiscoverForm() {
+  const router = useRouter();
   const searchRecipes = useAction(api.recipeDiscovery.search);
-  const queueRecipe = useMutation(api.recipeIngestion.queueDiscoveredUrl);
+  const createPreview = useMutation(api.recipePreviews.createFromDiscovery);
   const [query, setQuery] = useState("");
   const [terms, setTerms] = useState<string[]>([]);
   const [results, setResults] = useState<DiscoveryRecipe[]>([]);
+  const [searchResults, setSearchResults] = useState<DiscoveryRecipe[]>([]);
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [searched, setSearched] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
-  const [selectionIntent, setSelectionIntent] = useState<"create" | "current" | null>(null);
   const [detailRecipe, setDetailRecipe] = useState<DiscoveryRecipe | null>(null);
-  const [selectionMessage, setSelectionMessage] = useState("");
   const [error, setError] = useState("");
   const [resultsError, setResultsError] = useState("");
+  const [searchResultsError, setSearchResultsError] = useState("");
   const hasLoadedRecommendations = useRef(false);
   const requestVersion = useRef(0);
 
@@ -100,7 +102,7 @@ export function DiscoverForm() {
     setQuery("");
     setError("");
     setResultsError("");
-    setSelectionMessage("");
+    setSearchResultsError("");
     if (nextTerms.length === 0) {
       setError("Add at least one ingredient, flavor, cuisine, or dish.");
       return;
@@ -110,38 +112,41 @@ export function DiscoverForm() {
     setIsLoadingRecommendations(false);
     setIsSearching(true);
     setSearched(true);
-    setResults([]);
+    setSearchResults([]);
+    setSearchDialogOpen(true);
     try {
       const response = await searchRecipes({ terms: nextTerms, mode: "search" });
-      if (requestVersion.current === version) setResults(response.recipes.slice(0, 3));
+      if (requestVersion.current === version) {
+        setSearchResults(response.recipes.slice(0, 3));
+      }
     } catch {
       if (requestVersion.current === version) {
-        setResultsError("We couldn’t search for recipes right now. Please try again.");
+        setSearchResultsError("We couldn’t search for recipes right now. Please try again.");
       }
     } finally {
       if (requestVersion.current === version) setIsSearching(false);
     }
   }
 
-  async function selectRecipe(recipe: DiscoveryRecipe, setAsCurrent = false) {
+  async function selectRecipe(recipe: DiscoveryRecipe) {
     setError("");
     setSelectedUrl(recipe.url);
-    setSelectionIntent(setAsCurrent ? "current" : "create");
     try {
-      const importId = await queueRecipe({
-        sourceUrl: recipe.url,
+      const recipeId = await createPreview({
+        url: recipe.url,
+        title: recipe.title,
+        description: recipe.description,
+        source: recipe.source,
+        totalTimeMinutes: recipe.totalTimeMinutes,
+        matchedTerms: recipe.matchedTerms,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
         sourceQuery: terms.length > 0 ? terms.join(", ") : "recommended recipes",
-        ...(setAsCurrent ? { setAsCurrent: true } : {}),
       });
-      announceRecipeImport(importId);
-      setSelectionMessage(setAsCurrent
-        ? `${recipe.title} is being created and will become your current recipe when it’s ready.`
-        : `${recipe.title} is queued. We’ll let you know when the card is ready to view.`);
-      setDetailRecipe(null);
+      router.push(`/app/recipes/${recipeId}`);
     } catch {
       setSelectedUrl(null);
-      setSelectionIntent(null);
-      setError("We found that recipe, but couldn’t start its import. Try again.");
+      setError("We found that recipe, but couldn’t open its preview. Try again.");
     }
   }
 
@@ -215,12 +220,6 @@ export function DiscoverForm() {
           {searched && !isLoadingResults && <span className="text-sm font-bold text-primary">{results.length} {results.length === 1 ? "recipe" : "recipes"}</span>}
         </div>
 
-        {selectionMessage && (
-          <p className="mb-5 rounded-lg bg-primary-soft p-3 text-sm font-semibold text-primary" role="status">
-            {selectionMessage}
-          </p>
-        )}
-
         {isLoadingResults ? (
           <div aria-label="Searching for recipes">
             <p className="mb-4 rounded-lg bg-primary-soft p-3 text-sm font-semibold text-primary" role="status">
@@ -257,6 +256,55 @@ export function DiscoverForm() {
         )}
       </section>
 
+      <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
+        <DialogContent className="w-[min(94vw,960px)]">
+          <DialogTitle>Choose a recipe</DialogTitle>
+          <DialogDescription>
+            Select one result to open its full recipe page. It will not be added to your Recipe Book unless you save it there.
+          </DialogDescription>
+          {isSearching ? (
+            <div className="mt-6 grid-auto" aria-label="Searching for recipe matches">
+              {[0, 1, 2].map((item) => (
+                <Skeleton className="h-64" key={item} />
+              ))}
+            </div>
+          ) : searchResultsError ? (
+            <Alert className="mt-6 border-red-300 bg-red-50 text-red-900" role="alert">
+              <AlertTitle>Recipe search unavailable</AlertTitle>
+              <AlertDescription>{searchResultsError}</AlertDescription>
+            </Alert>
+          ) : searchResults.length === 0 ? (
+            <Alert className="mt-6">
+              <AlertTitle>No complete matches</AlertTitle>
+              <AlertDescription>Try a broader ingredient, flavor, cuisine, or dish.</AlertDescription>
+            </Alert>
+          ) : (
+            <div className="mt-6 grid-auto">
+              {searchResults.map((recipe) => (
+                <Card key={recipe.url}>
+                  <CardContent className="stack p-5">
+                    <div>
+                      <h3>{recipe.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">{recipe.description}</p>
+                    </div>
+                    <p className="rounded-lg bg-primary-soft p-3 text-sm text-primary">
+                      <strong>Why it fits:</strong> {recipe.matchReason}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {recipe.ingredients.length} ingredients · {recipe.instructions.length} steps
+                    </p>
+                    <Button onClick={() => void selectRecipe(recipe)} disabled={selectedUrl !== null}>
+                      <BookPlus size={16} />
+                      {selectedUrl === recipe.url ? "Opening…" : "Choose recipe"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={detailRecipe !== null} onOpenChange={(open) => { if (!open) setDetailRecipe(null); }}>
         {detailRecipe && (
           <DialogContent className="w-[min(94vw,880px)]">
@@ -284,11 +332,7 @@ export function DiscoverForm() {
             <div className="mt-6 cluster">
               <Button onClick={() => selectRecipe(detailRecipe)} disabled={selectedUrl !== null}>
                 <BookPlus size={16} />
-                {selectedUrl === detailRecipe.url && selectionIntent === "create" ? "Creating card…" : "Create recipe card"}
-              </Button>
-              <Button variant="secondary" onClick={() => selectRecipe(detailRecipe, true)} disabled={selectedUrl !== null}>
-                <CookingPot size={16} />
-                {selectedUrl === detailRecipe.url && selectionIntent === "current" ? "Setting up…" : "Set as current"}
+                {selectedUrl === detailRecipe.url ? "Opening…" : "Choose recipe"}
               </Button>
               <Button asChild variant="secondary">
                 <a href={detailRecipe.url} target="_blank" rel="noreferrer"><ExternalLink size={16} />View original</a>

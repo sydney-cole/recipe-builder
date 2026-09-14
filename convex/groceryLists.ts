@@ -416,7 +416,11 @@ export const createFromRecipe = mutation({
       )
       .unique();
     if (recipe.isPublic !== true && savedRecipe === null) {
-      throw new Error("Forbidden");
+      const recipeImport =
+        recipe.importId === undefined ? null : await ctx.db.get(recipe.importId);
+      if (recipeImport?.requestedBy !== userId) {
+        throw new Error("Forbidden");
+      }
     }
 
     if (!forceNew) {

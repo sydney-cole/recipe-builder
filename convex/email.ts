@@ -40,6 +40,48 @@ export const recentImports = query({
   },
 });
 
+export const importResult = query({
+  args: { importId: v.id("recipeImports") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      status: v.union(
+        v.literal("queued"),
+        v.literal("scraping"),
+        v.literal("scraped"),
+        v.literal("processing"),
+        v.literal("parsed"),
+        v.literal("needs_review"),
+        v.literal("completed"),
+        v.literal("failed"),
+      ),
+      recipeId: v.optional(v.id("recipes")),
+      title: v.optional(v.string()),
+      description: v.optional(v.string()),
+      sourceUrl: v.string(),
+      errorMessage: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx, { importId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Unauthenticated");
+    const recipeImport = await ctx.db.get(importId);
+    if (recipeImport === null || recipeImport.requestedBy !== userId) return null;
+    const recipe =
+      recipeImport.recipeId === undefined
+        ? null
+        : await ctx.db.get(recipeImport.recipeId);
+    return {
+      status: recipeImport.status,
+      recipeId: recipeImport.recipeId,
+      title: recipe?.title,
+      description: recipe?.description,
+      sourceUrl: recipeImport.sourceUrl,
+      errorMessage: recipeImport.errorMessage,
+    };
+  },
+});
+
 export const queueUrl = mutation({
   args: {
     sourceUrl: v.string(),

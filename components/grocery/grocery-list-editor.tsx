@@ -106,7 +106,7 @@ export function GroceryListEditor({
         })),
       });
       setSaveState("saved");
-      router.replace("/app/grocery-lists");
+      router.replace("/app");
     } catch {
       setSaveState("error");
     }

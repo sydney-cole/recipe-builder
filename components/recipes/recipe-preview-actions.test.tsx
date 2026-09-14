@@ -1,0 +1,29 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { RecipePreviewActions } from "./recipe-preview-actions";
+
+const mocks = vi.hoisted(() => ({ save: vi.fn(), push: vi.fn() }));
+
+vi.mock("convex/react", () => ({
+  useMutation: () => mocks.save,
+  useQuery: () => null,
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
+
+describe("RecipePreviewActions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.save.mockResolvedValue(null);
+  });
+
+  it("saves the preview and opens the Recipe Book", async () => {
+    const user = userEvent.setup();
+    render(<RecipePreviewActions recipeId={"recipe-1" as never} isSaved={false} />);
+
+    await user.click(screen.getByRole("button", { name: "Add to Recipe Book" }));
+
+    expect(mocks.save).toHaveBeenCalledWith({ recipeId: "recipe-1" });
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/app/recipe-book"));
+  });
+});

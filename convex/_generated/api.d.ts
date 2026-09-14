@@ -25,6 +25,7 @@ import type * as recipeDiscoveryCache from "../recipeDiscoveryCache.js";
 import type * as recipeImages from "../recipeImages.js";
 import type * as recipeImagesData from "../recipeImagesData.js";
 import type * as recipeIngestion from "../recipeIngestion.js";
+import type * as recipePreviews from "../recipePreviews.js";
 import type * as recipes from "../recipes.js";
 import type * as seed from "../seed.js";
 import type * as users from "../users.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   recipeImages: typeof recipeImages;
   recipeImagesData: typeof recipeImagesData;
   recipeIngestion: typeof recipeIngestion;
+  recipePreviews: typeof recipePreviews;
   recipes: typeof recipes;
   seed: typeof seed;
   users: typeof users;

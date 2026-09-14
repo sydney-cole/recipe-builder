@@ -36,7 +36,7 @@ describe("GroceryListEditor", () => {
     expect(screen.getByText("1")).toBeInTheDocument();
   });
 
-  it("saves a new list and returns to all grocery lists", async () => {
+  it("saves a new list and returns home", async () => {
     const user = userEvent.setup();
     mocks.save.mockResolvedValueOnce("list-123");
     render(<GroceryListEditor initialItems={[]} initialName="Weekend trip" />);
@@ -51,7 +51,7 @@ describe("GroceryListEditor", () => {
         items: [expect.objectContaining({ name: "Milk", itemId: undefined })],
       }),
     );
-    expect(mocks.replace).toHaveBeenCalledWith("/app/grocery-lists");
+    expect(mocks.replace).toHaveBeenCalledWith("/app");
   });
 
   it("updates an existing list with its persisted item IDs", async () => {
@@ -90,7 +90,7 @@ describe("GroceryListEditor", () => {
         ],
       }),
     );
-    expect(mocks.replace).toHaveBeenCalledWith("/app/grocery-lists");
+    expect(mocks.replace).toHaveBeenCalledWith("/app");
   });
 
   it("adds, edits, checks, removes, and restores an item", async () => {

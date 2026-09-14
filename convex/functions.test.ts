@@ -120,6 +120,10 @@ describe("email functions", () => {
     });
 
     expect(second).toBe(first);
+    expect(await asAda.query(api.email.importResult, { importId: first })).toMatchObject({
+      status: "queued",
+      sourceUrl: "https://example.com/recipe?a=1&b=2",
+    });
     const imports = await asAda.query(api.email.recentImports);
     expect(imports).toHaveLength(1);
     expect(imports[0].normalizedUrl).toBe("https://example.com/recipe?a=1&b=2");
@@ -254,7 +258,7 @@ describe("user settings", () => {
 });
 
 describe("recipe authorization", () => {
-  it("only returns public, imported, or explicitly saved recipes", async () => {
+  it("keeps previews out of the Recipe Book until the user saves them", async () => {
     const t = initTest();
     const adaId = await createUser(t, "Ada");
     const graceId = await createUser(t, "Grace");
@@ -280,10 +284,14 @@ describe("recipe authorization", () => {
     expect(new Set(visible.map((recipe) => recipe._id))).toEqual(
       new Set([publicId, adaPrivateId, sharedId]),
     );
+    expect(await asAda.query(api.recipes.get, { recipeId: publicId })).toMatchObject({
+      recipe: { _id: publicId },
+    });
     expect(await asAda.query(api.recipes.get, { recipeId: gracePrivateId })).toBeNull();
     expect(await asAda.query(api.recipes.get, { recipeId: adaPrivateId })).toMatchObject({
       recipe: { _id: adaPrivateId },
       ingredients: [],
+      saved: null,
     });
 
     await asAda.mutation(api.recipeCards.setCurrent, { recipeId: adaPrivateId });
@@ -297,6 +305,12 @@ describe("recipe authorization", () => {
     ).rejects.toThrow(/Forbidden/);
     await asAda.mutation(api.recipeCards.setCurrent, { recipeId: null });
     expect(await asAda.query(api.recipes.current)).toBeNull();
+
+    await asAda.mutation(api.recipeCards.addToBook, { recipeId: adaPrivateId });
+    await asAda.mutation(api.recipeCards.addToBook, { recipeId: adaPrivateId });
+    expect(
+      new Set((await asAda.query(api.recipes.list)).map((recipe) => recipe._id)),
+    ).toEqual(new Set([publicId, adaPrivateId, sharedId]));
   });
 
   it("rejects anonymous access", async () => {
@@ -442,6 +456,53 @@ describe("recipe scrape persistence", () => {
       const recipeImport = await ctx.db.get(importId);
       expect(recipeImport?.status).toBe("failed");
       expect(recipeImport?.errorMessage).toHaveLength(500);
+    });
+  });
+});
+
+describe("discovery recipe previews", () => {
+  it("reuses loaded search details without saving or scraping the recipe again", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "Previewer");
+    const asUser = t.withIdentity({ subject: userId });
+    const args = {
+      url: "https://example.com/lemon-chicken?utm_source=search",
+      title: "Lemon chicken",
+      description: "A bright weeknight dinner.",
+      source: "Example Kitchen",
+      totalTimeMinutes: 35,
+      matchedTerms: ["chicken", "lemon"],
+      ingredients: ["1 pound chicken thighs", "1 lemon"],
+      instructions: ["Season the chicken.", "Cook and finish with lemon."],
+      sourceQuery: "chicken, lemon",
+    };
+
+    const recipeId = await asUser.mutation(
+      api.recipePreviews.createFromDiscovery,
+      args,
+    );
+    expect(
+      await asUser.mutation(api.recipePreviews.createFromDiscovery, args),
+    ).toBe(recipeId);
+    expect(await asUser.query(api.recipes.listBook)).toEqual([]);
+    expect(await asUser.query(api.recipes.get, { recipeId })).toMatchObject({
+      recipe: { title: "Lemon chicken", totalTimeMinutes: 35 },
+      ingredients: [
+        { originalText: "1 pound chicken thighs" },
+        { originalText: "1 lemon" },
+      ],
+      saved: null,
+    });
+
+    const listId = await asUser.mutation(api.groceryLists.createFromRecipe, {
+      recipeId,
+    });
+    expect(await asUser.query(api.groceryLists.get, { listId })).toMatchObject({
+      list: { name: "Lemon chicken" },
+      items: [
+        { name: "chicken thighs" },
+        { name: "lemon" },
+      ],
     });
   });
 });
