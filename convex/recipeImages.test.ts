@@ -5,7 +5,9 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
-const modules = import.meta.glob("./**/!(*.test).ts");
+// Match the proven backend-test glob so a clean checkout includes Convex's
+// checked-in generated JavaScript modules as well as the function modules.
+const modules = import.meta.glob("./**/*.*s");
 
 function initTest() {
   return convexTest(schema, modules);
