@@ -1027,6 +1027,7 @@ describe("grocery list validation branches", () => {
       await ctx.db.patch(source!._id, { recipeId: unrelatedRecipeId });
     });
     const result = await asOwner.query(api.groceryLists.get, { listId });
+    expect(result?.list.sourceRecipeIds).toEqual([recipeId]);
     expect(result?.items).toHaveLength(5);
     expect(result?.items.find((item) => item.normalizedName === "milk")).toMatchObject({ quantity: 2, quantityText: "2", unit: "cup" });
     expect(result?.items.find((item) => item.normalizedName === "bread")).toMatchObject({ quantity: 1 });

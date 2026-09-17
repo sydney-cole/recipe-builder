@@ -34,6 +34,7 @@ const groceryListValidator = v.object({
   name: v.string(),
   sourceRecipeId: v.optional(v.id("recipes")),
   sourceRecipeTitle: v.optional(v.string()),
+  sourceRecipeIds: v.optional(v.array(v.id("recipes"))),
   status: groceryListStatus,
   completedAt: v.optional(v.number()),
   createdAt: v.number(),
@@ -446,6 +447,7 @@ export const createFromRecipe = mutation({
       name: recipe.title,
       sourceRecipeId: recipeId,
       sourceRecipeTitle: recipe.title,
+      sourceRecipeIds: [recipeId],
       status: "active",
       createdAt: now,
       updatedAt: now,
@@ -593,7 +595,12 @@ export const addRecipeToList = mutation({
         createdAt: now,
       });
     }
-    await ctx.db.patch(listId, { updatedAt: now });
+    const sourceRecipeIds = [...new Set([
+      ...(list.sourceRecipeIds ?? []),
+      ...(list.sourceRecipeId === undefined ? [] : [list.sourceRecipeId]),
+      recipeId,
+    ])].slice(0, 500);
+    await ctx.db.patch(listId, { sourceRecipeIds, updatedAt: now });
     return listId;
   },
 });
@@ -829,10 +836,17 @@ export const combineLists = mutation({
     }
 
     const now = Date.now();
+    const sourceRecipeIds = [...new Set([
+      ...(firstList.sourceRecipeIds ?? []),
+      ...(firstList.sourceRecipeId === undefined ? [] : [firstList.sourceRecipeId]),
+      ...(secondList.sourceRecipeIds ?? []),
+      ...(secondList.sourceRecipeId === undefined ? [] : [secondList.sourceRecipeId]),
+    ])].slice(0, 500);
     const combinedListId = await ctx.db.insert("groceryLists", {
       userId,
       clientRequestId,
       name: combinedName,
+      sourceRecipeIds: sourceRecipeIds.length > 0 ? sourceRecipeIds : undefined,
       status: "active",
       createdAt: now,
       updatedAt: now,

@@ -35,4 +35,18 @@ describe("GroceryListsPage", () => {
       "/app/grocery-lists/list-123",
     );
   });
+
+  it("uses equal-height cards and truncates list titles", () => {
+    render(<GroceryListsPage />);
+
+    const title = screen.getByRole("heading", { name: "Weekend trip" });
+    expect(title).toHaveClass("truncate");
+    expect(title).toHaveAttribute("title", "Weekend trip");
+    expect(title.closest(".card")).toHaveClass("h-64");
+
+    const createCard = screen
+      .getByRole("link", { name: "Start another grocery list" })
+      .querySelector(".card");
+    expect(createCard).toHaveClass("h-64");
+  });
 });

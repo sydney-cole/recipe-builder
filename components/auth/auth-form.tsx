@@ -165,17 +165,22 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             <label className="grid gap-2 text-sm font-bold">
               Email
               <div className="relative">
-                <Mail className="absolute left-3 top-3.5 text-muted-foreground" size={17} />
-                <Input className="pl-10" required name="email" type="email" autoComplete="email" placeholder="you@example.com" />
+                <Mail className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} aria-hidden />
+                <Input className="auth-input-with-icon" required name="email" type="email" autoComplete="email" placeholder="you@example.com" />
               </div>
             </label>
             <label className="grid gap-2 text-sm font-bold">
               Password
               <div className="relative">
-                <LockKeyhole className="absolute left-3 top-3.5 text-muted-foreground" size={17} />
-                <Input className="pl-10" required minLength={8} name="password" type="password" autoComplete={isSignUp ? "new-password" : "current-password"} placeholder="At least 8 characters" />
+                <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} aria-hidden />
+                <Input className="auth-input-with-icon" required minLength={8} name="password" type="password" autoComplete={isSignUp ? "new-password" : "current-password"} placeholder="At least 8 characters" />
               </div>
             </label>
+            {!isSignUp && (
+              <Link className="justify-self-end text-sm font-bold text-primary underline underline-offset-4" href="/forgot-password">
+                Forgot your password?
+              </Link>
+            )}
             <Button disabled={isSubmitting} type="submit" size="lg" className="mt-2">
               {isSubmitting ? "Please wait…" : isSignUp ? "Create account" : "Sign in"}
               {!isSubmitting && <ArrowRight size={17} />}

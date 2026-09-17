@@ -52,8 +52,17 @@ export default function RecipeBookPage() {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <label className="relative flex-1">
           <span className="sr-only">Search Recipe Book</span>
-          <Search className="absolute left-3 top-3.5 text-muted-foreground" size={17} />
-          <Input className="pl-10" placeholder="Search your Recipe Book" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            size={17}
+            aria-hidden
+          />
+          <Input
+            className="search-input-with-icon"
+            placeholder="Search your Recipe Book"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
         </label>
       </div>
       <div className="mb-4 flex items-center justify-between">

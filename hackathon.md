@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-14T12:41:38Z
+- **Last updated:** 2026-09-17T13:01:40Z
 
 ## Log
 
@@ -226,3 +226,22 @@ existing once-per-24-hours recommendation cache. Added authenticated backend,
 interaction, scrape, and image coverage for the merged workflow
 (`convex/recipeDiscovery.ts`, `convex/functions.test.ts`,
 `convex/lib/recipeScrape.test.ts`, `convex/recipeImages.test.ts`).
+
+### 2026-09-17 - working tree
+Added an email-code password recovery flow to Convex Auth using the configured
+AgentMail inbox, plus accessible reset screens, login-field icon spacing, and
+setup documentation for `AGENTMAIL_INBOX_ID` (`convex/auth.ts`,
+`components/auth/`, `app/(auth)/forgot-password/`, `README.md`).
+
+Added an explicitly temporary Firecrawl-free Discover mode with three complete
+local recipes so the selection, unsaved preview, Recipe Book, and grocery-list
+handoffs remain testable while scrape credits are unavailable
+(`lib/data/temporary-discovery-demo.ts`, `components/discovery/discover-form.tsx`).
+
+Standardized grocery-list card dimensions and truncation, fixed Recipe Book
+search-icon spacing, and prevented silent duplicate recipe lists. Grocery lists
+now retain bounded recipe provenance through additions and merges; trying to
+create another list for the same recipe presents an explicit Yes/No confirmation.
+The optional schema addition was deployed to development, and the full suite
+passes 140 tests (`convex/schema.ts`, `convex/groceryLists.ts`,
+`components/grocery/add-recipe-to-list-button.tsx`, `app/(app)/app/grocery-lists/`).

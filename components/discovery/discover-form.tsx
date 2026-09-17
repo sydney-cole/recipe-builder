@@ -13,6 +13,11 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
+import {
+  DISCOVERY_DEMO_MODE,
+  isTemporaryDemoRecipe,
+  TEMPORARY_DISCOVERY_RECIPES,
+} from "@/lib/data/temporary-discovery-demo";
 
 const starters = ["chicken thighs", "broccoli", "cozy", "30-minute dinner"];
 const MAX_VISIBLE_TERMS = 6;
@@ -41,12 +46,14 @@ export function DiscoverForm() {
   const createPreview = useMutation(api.recipePreviews.createFromDiscovery);
   const [query, setQuery] = useState("");
   const [terms, setTerms] = useState<string[]>([]);
-  const [results, setResults] = useState<DiscoveryRecipe[]>([]);
+  const [results, setResults] = useState<DiscoveryRecipe[]>(
+    DISCOVERY_DEMO_MODE ? TEMPORARY_DISCOVERY_RECIPES : [],
+  );
   const [searchResults, setSearchResults] = useState<DiscoveryRecipe[]>([]);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const [searched, setSearched] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
-  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(!DISCOVERY_DEMO_MODE);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   const [detailRecipe, setDetailRecipe] = useState<DiscoveryRecipe | null>(null);
   const [error, setError] = useState("");
@@ -58,9 +65,11 @@ export function DiscoverForm() {
   useEffect(() => {
     if (hasLoadedRecommendations.current) return;
     hasLoadedRecommendations.current = true;
+
+    // TEMPORARY DEMO MODE: bypass Firecrawl while test credits are unavailable.
+    if (DISCOVERY_DEMO_MODE) return;
+
     const version = ++requestVersion.current;
-    setIsLoadingRecommendations(true);
-    setSearched(true);
     void searchRecipes({ terms: [], mode: "recommended" })
       .then((response) => {
         if (requestVersion.current === version) setResults(response.recipes.slice(0, 3));
@@ -114,6 +123,23 @@ export function DiscoverForm() {
     setSearched(true);
     setSearchResults([]);
     setSearchDialogOpen(true);
+
+    // TEMPORARY DEMO MODE: search the local fixtures without a Firecrawl call.
+    if (DISCOVERY_DEMO_MODE) {
+      const matchingRecipes = TEMPORARY_DISCOVERY_RECIPES.filter((recipe) => {
+        const searchableText = [
+          recipe.title,
+          recipe.description,
+          ...recipe.matchedTerms,
+          ...recipe.ingredients,
+        ].join(" ").toLowerCase();
+        return nextTerms.some((term) => searchableText.includes(term));
+      });
+      setSearchResults(matchingRecipes.length > 0 ? matchingRecipes : TEMPORARY_DISCOVERY_RECIPES);
+      setIsSearching(false);
+      return;
+    }
+
     try {
       const response = await searchRecipes({ terms: nextTerms, mode: "search" });
       if (requestVersion.current === version) {
@@ -216,7 +242,14 @@ export function DiscoverForm() {
 
       <section className="discovery-recommendations" aria-labelledby="matches-title" aria-live="polite">
         <div className="section-row">
-          <div><h2 id="matches-title" className="section-heading">Recommended recipes</h2><p className="section-copy">Up to three highly rated recipes from the web, selected and explained by the PerfectPlate agent.</p></div>
+          <div>
+            <h2 id="matches-title" className="section-heading">{DISCOVERY_DEMO_MODE ? "Demo recipes" : "Recommended recipes"}</h2>
+            <p className="section-copy">
+              {DISCOVERY_DEMO_MODE
+                ? "Temporary complete recipes for testing without using Firecrawl credits."
+                : "Up to three highly rated recipes from the web, selected and explained by the PerfectPlate agent."}
+            </p>
+          </div>
           {searched && !isLoadingResults && <span className="text-sm font-bold text-primary">{results.length} {results.length === 1 ? "recipe" : "recipes"}</span>}
         </div>
 
@@ -242,7 +275,11 @@ export function DiscoverForm() {
                   <p className="rounded-lg bg-primary-soft p-3 text-sm leading-5 text-primary"><strong>Why it fits:</strong> {recipe.matchReason}</p>
                   {recipe.matchedTerms.length > 0 && <div className="cluster">{recipe.matchedTerms.map((term) => <Badge key={term}>{term}</Badge>)}</div>}
                   <Button onClick={() => setDetailRecipe(recipe)}><BookPlus size={16} />View recipe</Button>
-                  <a className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4" href={recipe.url} target="_blank" rel="noreferrer">Source: {recipe.source} <ExternalLink size={12} aria-hidden /></a>
+                  {isTemporaryDemoRecipe(recipe.url) ? (
+                    <span className="text-xs text-muted-foreground">Source: {recipe.source}</span>
+                  ) : (
+                    <a className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4" href={recipe.url} target="_blank" rel="noreferrer">Source: {recipe.source} <ExternalLink size={12} aria-hidden /></a>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -334,9 +371,11 @@ export function DiscoverForm() {
                 <BookPlus size={16} />
                 {selectedUrl === detailRecipe.url ? "Opening…" : "Choose recipe"}
               </Button>
-              <Button asChild variant="secondary">
-                <a href={detailRecipe.url} target="_blank" rel="noreferrer"><ExternalLink size={16} />View original</a>
-              </Button>
+              {!isTemporaryDemoRecipe(detailRecipe.url) && (
+                <Button asChild variant="secondary">
+                  <a href={detailRecipe.url} target="_blank" rel="noreferrer"><ExternalLink size={16} />View original</a>
+                </Button>
+              )}
             </div>
           </DialogContent>
         )}

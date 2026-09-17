@@ -39,6 +39,22 @@ describe("AuthForm", () => {
     expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
+  it("reserves space for the email and password field icons", () => {
+    render(<AuthForm mode="sign-in" />);
+
+    expect(screen.getByLabelText("Email")).toHaveClass("auth-input-with-icon");
+    expect(screen.getByLabelText("Password")).toHaveClass("auth-input-with-icon");
+  });
+
+  it("links sign-in users to password recovery", () => {
+    render(<AuthForm mode="sign-in" />);
+
+    expect(screen.getByRole("link", { name: "Forgot your password?" })).toHaveAttribute(
+      "href",
+      "/forgot-password",
+    );
+  });
+
   it("does not expose unexpected backend error details", async () => {
     mocks.signIn.mockRejectedValue(new Error("internal deployment detail"));
     const user = userEvent.setup();

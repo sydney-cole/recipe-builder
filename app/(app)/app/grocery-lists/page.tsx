@@ -29,24 +29,33 @@ export default function GroceryListsPage() {
           </Button>
         }
       />
-      <div className="grid-auto">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {lists === undefined ? (
           <Skeleton className="h-56" aria-label="Loading grocery lists" />
         ) : (
           lists.map((list) => (
-            <Link href={`/app/grocery-lists/${list._id}`} key={list._id}>
-              <Card className="recipe-card">
-                <CardContent className="p-6">
+            <Link
+              className="h-full min-w-0"
+              href={`/app/grocery-lists/${list._id}`}
+              key={list._id}
+            >
+              <Card className="recipe-card h-64">
+                <CardContent className="flex h-full min-w-0 flex-col p-6">
                   <span className="grid size-12 place-items-center rounded-xl bg-primary-soft text-primary">
                     <ShoppingBasket />
                   </span>
-                  <h2 className="mt-5 text-xl font-extrabold">{list.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <h2
+                    className="mt-5 truncate text-xl font-extrabold"
+                    title={list.name}
+                  >
+                    {list.name}
+                  </h2>
+                  <p className="mt-1 truncate text-sm text-muted-foreground">
                     {list.sourceRecipeTitle
                       ? `From ${list.sourceRecipeTitle}`
                       : "Manual grocery list"}
                   </p>
-                  <div className="mt-6 flex items-center justify-between border-t border-border pt-4 text-sm">
+                  <div className="mt-auto flex items-center justify-between border-t border-border pt-4 text-sm">
                     <span className="text-muted-foreground">
                       <CalendarDays className="inline" size={16} /> Saved list
                     </span>
@@ -57,9 +66,13 @@ export default function GroceryListsPage() {
             </Link>
           ))
         )}
-        <Link href={newListHref} aria-label="Start another grocery list">
-          <Card className="recipe-card border-dashed">
-            <CardContent className="grid min-h-56 place-items-center text-center">
+        <Link
+          className="h-full min-w-0"
+          href={newListHref}
+          aria-label="Start another grocery list"
+        >
+          <Card className="recipe-card h-64 border-dashed">
+            <CardContent className="grid h-full place-items-center text-center">
               <div>
                 <Plus className="mx-auto text-muted-foreground" />
                 <p className="mt-3 font-extrabold">Start another list</p>

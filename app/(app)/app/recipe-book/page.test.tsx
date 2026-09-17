@@ -55,6 +55,14 @@ const recipes = [
 ];
 
 describe("RecipeBookPage", () => {
+  it("reserves space for the search icon", () => {
+    render(<RecipeBookPage />);
+
+    expect(screen.getByPlaceholderText("Search your Recipe Book")).toHaveClass(
+      "search-input-with-icon",
+    );
+  });
+
   beforeEach(() => {
     queryState.value = recipes;
   });

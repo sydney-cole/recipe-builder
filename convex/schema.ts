@@ -261,6 +261,7 @@ export default defineSchema({
     name: v.string(),
     sourceRecipeId: v.optional(v.id("recipes")),
     sourceRecipeTitle: v.optional(v.string()),
+    sourceRecipeIds: v.optional(v.array(v.id("recipes"))),
     status: groceryListStatus,
     completedAt: v.optional(v.number()),
     createdAt: v.number(),

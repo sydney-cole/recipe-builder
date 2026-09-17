@@ -114,7 +114,9 @@ still use some data from `lib/data/mock-data.ts`.
 Generated recipe lists and manually created lists use the Convex-backed editor;
 see `FRONTEND_DESIGN_GAPS.md` for remaining design decisions.
 
-## Convex project setup
+## Setup
+
+### Convex project
 
 Install dependencies and connect the local checkout to its Convex development
 deployment:
@@ -124,7 +126,7 @@ npm install
 npx convex dev
 ```
 
-## Firecrawl
+### Firecrawl
 
 The project uses Firecrawl's official Convex component. Direct, email-forwarded,
 and trusted agent-discovered recipe URLs run through a durable workflow that
@@ -147,7 +149,7 @@ npx convex env set FIRECRAWL_WEBHOOK_SECRET
 Never put either secret in Git or in client-side environment variables. Each
 developer or deployment must configure its own Convex environment variables.
 
-## OpenAI recipe agent
+### OpenAI recipe agent
 
 After Firecrawl stores a recipe artifact, the Convex Agent component uses an
 OpenAI model through OpenAI's API directly. It creates an editable recipe card,
@@ -186,19 +188,41 @@ grocery items. Recipe-card removal is a soft deletion so generated grocery data
 can remain independent; deleting a grocery list removes that list and its item
 provenance without deleting the recipe.
 
-## AgentMail
+### AgentMail
 
 The official AgentMail Convex component stores inbox messages and threads,
 verifies inbound webhook signatures, and routes recipe links into the
 `recipeImports` table.
 
-Create an API key in the AgentMail console, then enter it and the existing inbox
-identifier directly into the Convex development deployment:
+Open the [AgentMail console](https://console.agentmail.to) and select the
+AgentMail account that will send PerfectPlate email. Create an API key, then
+open **Inboxes** and either select an existing inbox or create one. Copy its
+inbox ID, which is usually the inbox email address (for example,
+`perfectplate@agentmail.to`). The inbox and API key must belong to the same
+AgentMail account; otherwise AgentMail returns `404 Inbox not found` when the
+application tries to send mail.
+
+Store both values directly on the Convex development deployment. Omit each
+value from the command so the CLI prompts for it without placing the secret in
+your shell history:
 
 ```sh
 npx convex env set AGENTMAIL_API_KEY
 npx convex env set AGENTMAIL_INBOX_ID
 ```
+
+If you need to target a particular deployment explicitly, append its deployment
+name to both commands:
+
+```sh
+npx convex env set AGENTMAIL_API_KEY --deployment <deployment-name>
+npx convex env set AGENTMAIL_INBOX_ID --deployment <deployment-name>
+```
+
+PerfectPlate uses this configured inbox both for recipe-email intake and for
+sending password-reset codes. After changing either value, run
+`npx convex dev --once` so the development backend is refreshed before testing
+email delivery.
 
 Start the application, create an account, and use **Connect recipe inbox** on
 the imports page. Then register this endpoint in the AgentMail console:

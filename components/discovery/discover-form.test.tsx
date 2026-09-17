@@ -38,37 +38,37 @@ describe("DiscoverForm", () => {
     render(<DiscoverForm />);
     await user.click(screen.getByRole("button", { name: "Find recipes" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Add at least one");
-    expect(mocks.search).toHaveBeenCalledWith({ terms: [], mode: "recommended" });
+    expect(mocks.search).not.toHaveBeenCalled();
     expect(mocks.search).not.toHaveBeenCalledWith({ terms: [], mode: "search" });
-    expect(screen.getByRole("heading", { name: "Recommended recipes" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Demo recipes" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Already have a recipe in mind?" })).toHaveClass("page-title");
     expect(screen.getByText(/create an editable recipe card/)).toBeInTheDocument();
   });
 
-  it("loads web recommendations automatically and opens complete recipe details", async () => {
+  it("loads temporary demo recipes without Firecrawl and opens complete recipe details", async () => {
     const user = userEvent.setup();
     render(<DiscoverForm />);
 
-    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith({ terms: [], mode: "recommended" }));
-    await user.click(await screen.findByRole("button", { name: "View recipe" }));
+    expect(mocks.search).not.toHaveBeenCalled();
+    await user.click(screen.getAllByRole("button", { name: "View recipe" })[0]);
 
-    expect(screen.getByRole("dialog")).toHaveTextContent("1 pound chicken thighs");
-    expect(screen.getByRole("dialog")).toHaveTextContent("Cook until golden and finish with lemon.");
+    expect(screen.getByRole("dialog")).toHaveTextContent("2 (15-ounce) cans chickpeas");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Fold in the spinach");
     expect(screen.getByRole("button", { name: "Choose recipe" })).toBeInTheDocument();
   });
 
-  it("explains that live recommendations are loading", () => {
-    mocks.search.mockImplementation(() => new Promise(() => undefined));
+  it("labels the temporary Firecrawl-free recipe source", () => {
     render(<DiscoverForm />);
-    expect(screen.getByRole("status")).toHaveTextContent("Searching the web and loading complete recipe details");
+    expect(screen.getByText(/Temporary complete recipes/)).toBeInTheDocument();
+    expect(screen.getAllByText("Source: PerfectPlate Demo Kitchen")).toHaveLength(3);
   });
 
   it("adds clear spacing between the major discovery sections", async () => {
     const { container } = render(<DiscoverForm />);
-    await screen.findByRole("button", { name: "View recipe" });
+    expect(screen.getAllByRole("button", { name: "View recipe" })).toHaveLength(3);
     expect(container.firstElementChild).toHaveClass("discovery-sections");
     expect(screen.getByRole("heading", { name: "Already have a recipe in mind?" }).parentElement).toHaveClass("known-recipe-heading");
-    expect(screen.getByRole("heading", { name: "Recommended recipes" }).closest("section")).toHaveClass("discovery-recommendations");
+    expect(screen.getByRole("heading", { name: "Demo recipes" }).closest("section")).toHaveClass("discovery-recommendations");
     expect(screen.getByRole("button", { name: "Find recipes" })).toHaveClass("button-lg", "w-full");
     expect(screen.getByRole("button", { name: "Import recipe" })).toHaveClass("button-lg", "w-full");
   });
@@ -79,8 +79,8 @@ describe("DiscoverForm", () => {
     const input = screen.getByPlaceholderText(/chicken, broccoli/);
     await user.type(input, "Chicken, Lemon");
     await user.click(screen.getByRole("button", { name: "Find recipes" }));
-    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith({ terms: ["chicken", "lemon"], mode: "search" }));
-    expect(await screen.findByRole("dialog", { name: "Choose a recipe" })).toHaveTextContent("Lemon chicken");
+    expect(mocks.search).not.toHaveBeenCalled();
+    expect(await screen.findByRole("dialog", { name: "Choose a recipe" })).toHaveTextContent("Sheet-Pan Lemon Herb Chicken");
   });
 
   it("accumulates selected constraints in the input and only removes chips with their remove buttons", async () => {
@@ -109,10 +109,7 @@ describe("DiscoverForm", () => {
     await user.type(screen.getByPlaceholderText(/chicken, broccoli/), "italian, spicy, pasta");
     await user.click(screen.getByRole("button", { name: "Find recipes" }));
 
-    await waitFor(() => expect(mocks.search).toHaveBeenCalledWith({
-      terms: ["broccoli", "cozy", "30-minute dinner", "italian", "spicy", "pasta"],
-      mode: "search",
-    }));
+    expect(mocks.search).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Close dialog" }));
     expect(screen.queryByRole("button", { name: "Remove chicken thighs" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /^Remove / })).toHaveLength(6);
@@ -125,14 +122,14 @@ describe("DiscoverForm", () => {
     await user.click(screen.getByRole("button", { name: "Find recipes" }));
     await user.click(await screen.findByRole("button", { name: "Choose recipe" }));
     expect(mocks.create).toHaveBeenCalledWith({
-      url: result.url,
-      title: result.title,
-      description: result.description,
-      source: result.source,
-      totalTimeMinutes: result.totalTimeMinutes,
-      matchedTerms: result.matchedTerms,
-      ingredients: result.ingredients,
-      instructions: result.instructions,
+      url: "https://demo.perfectplate.example.com/recipes/sheet-pan-lemon-herb-chicken",
+      title: "Sheet-Pan Lemon Herb Chicken",
+      description: "Roasted chicken thighs, potatoes, and broccoli with plenty of lemon and herbs.",
+      source: "PerfectPlate Demo Kitchen",
+      totalTimeMinutes: 50,
+      matchedTerms: ["chicken", "lemon", "broccoli"],
+      ingredients: expect.arrayContaining(["1 1/2 pounds boneless chicken thighs", "1 lemon"]),
+      instructions: expect.arrayContaining(["Heat the oven to 425°F and line a large sheet pan."]),
       sourceQuery: "chicken thighs",
     });
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/app/recipes/recipe-123"));
