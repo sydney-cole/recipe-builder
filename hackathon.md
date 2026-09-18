@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-17T13:01:40Z
+- **Last updated:** 2026-09-18T18:29:01Z
 
 ## Log
 
@@ -227,7 +227,7 @@ interaction, scrape, and image coverage for the merged workflow
 (`convex/recipeDiscovery.ts`, `convex/functions.test.ts`,
 `convex/lib/recipeScrape.test.ts`, `convex/recipeImages.test.ts`).
 
-### 2026-09-17 - working tree
+### 2026-09-17 - 2d4dc48
 Added an email-code password recovery flow to Convex Auth using the configured
 AgentMail inbox, plus accessible reset screens, login-field icon spacing, and
 setup documentation for `AGENTMAIL_INBOX_ID` (`convex/auth.ts`,
@@ -245,3 +245,19 @@ create another list for the same recipe presents an explicit Yes/No confirmation
 The optional schema addition was deployed to development, and the full suite
 passes 140 tests (`convex/schema.ts`, `convex/groceryLists.ts`,
 `components/grocery/add-recipe-to-list-button.tsx`, `app/(app)/app/grocery-lists/`).
+
+### 2026-09-18 - working tree
+Added a reusable Firecrawl Agent request guard with a deployment-configurable
+500-credit default and tests that reject unsafe ceilings. Added a separate
+deployment flag that pauses automatic daily recommendation refreshes while
+continuing to serve cached recommendations and leaving manual searches and link
+imports available (`convex/lib/firecrawlAgent.ts`, `convex/lib/featureFlags.ts`,
+`convex/recipeDiscovery.ts`, `convex/convex.config.ts`, `README.md`).
+
+Refined active cooking and grocery-list flows. Declining the duplicate-list
+confirmation now closes the dialog completely. The Home current-recipe card now
+offers clear View, Change, and Clear actions; Change opens a dedicated Recipe
+Book selection mode, updates the current recipe, and returns home after a
+selection (`components/grocery/add-recipe-to-list-button.tsx`,
+`components/recipes/current-recipe-panel.tsx`, `components/recipes/recipe-card.tsx`,
+`app/(app)/app/recipe-book/page.tsx`).

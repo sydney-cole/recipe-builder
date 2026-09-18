@@ -19,11 +19,17 @@ export function RecipeCard({
   suggested = false,
   detailsHref = `/app/recipe-book/${recipe.id}`,
   canCreateGroceryList = false,
+  onSelect,
+  isSelecting = false,
+  selectionDisabled = false,
 }: {
   recipe: Recipe;
   suggested?: boolean;
   detailsHref?: string | null;
   canCreateGroceryList?: boolean;
+  onSelect?: (recipeId: string) => void;
+  isSelecting?: boolean;
+  selectionDisabled?: boolean;
 }) {
   const [savedLocally, setSavedLocally] = useState(false);
   const saved = !suggested || savedLocally;
@@ -42,6 +48,35 @@ export function RecipeCard({
     } finally {
       setIsSaving(false);
     }
+  }
+
+  if (onSelect) {
+    return (
+      <Card className="recipe-card transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
+        <button
+          type="button"
+          className="flex h-full w-full flex-col text-left disabled:cursor-wait disabled:opacity-60"
+          aria-label={`Choose ${recipe.title}`}
+          disabled={selectionDisabled}
+          onClick={() => onSelect(recipe.id)}
+        >
+          <FoodArt variant={recipe.art} label={recipe.tags[0]} imageUrl={recipe.imageUrl} />
+          <CardContent className="stack flex-1">
+            <div>
+              <h3>{recipe.title}</h3>
+              <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{recipe.description}</p>
+            </div>
+            <div className="recipe-meta">
+              {recipe.totalMinutes !== undefined && <span><Clock3 size={14} className="inline" /> {recipe.totalMinutes} min</span>}
+              {recipe.servings !== undefined && <span><Users size={14} className="inline" /> {recipe.servings}</span>}
+            </div>
+            <span className="mt-auto inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-extrabold text-white">
+              {isSelecting ? "Selecting…" : "Choose recipe"}
+            </span>
+          </CardContent>
+        </button>
+      </Card>
+    );
   }
 
   return (

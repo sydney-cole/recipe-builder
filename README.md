@@ -139,6 +139,30 @@ Create a Firecrawl API key and set it on your Convex development deployment:
 npx convex env set FIRECRAWL_API_KEY
 ```
 
+Firecrawl Agent tasks must be built with `withFirecrawlMaxCredits` from
+`convex/lib/firecrawlAgent.ts`. It adds the API's `maxCredits` request field and
+defaults to a 500-credit ceiling per agent run. Set the ceiling explicitly on
+each development and production deployment so a shared account cannot silently
+fall back to Firecrawl's larger default:
+
+```sh
+npx convex env set FIRECRAWL_AGENT_MAX_CREDITS 500
+```
+
+Values must be whole numbers from 1 through 2,500; the app rejects invalid or
+higher values. The current recipe flows use Firecrawl Search and Scrape rather
+than Firecrawl Agent, so their usage is controlled separately by bounded search
+results, cached scrapes, and the once-daily recommendations refresh.
+
+To pause the automatic daily recommendations refresh while preserving cached
+recommendations, manual searches, and link imports, set this deployment flag:
+
+```sh
+npx convex env set RECIPE_RECOMMENDATIONS_REFRESH_ENABLED false
+```
+
+Set it back to `true` when daily recommendations should resume.
+
 For durable crawls, create a webhook secret in the Firecrawl dashboard and set
 it on the same deployment:
 

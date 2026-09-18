@@ -8,7 +8,9 @@ import { v } from "convex/values";
 const app = defineApp({
   env: {
     FIRECRAWL_API_KEY: v.string(),
+    FIRECRAWL_AGENT_MAX_CREDITS: v.optional(v.string()),
     FIRECRAWL_WEBHOOK_SECRET: v.optional(v.string()),
+    RECIPE_RECOMMENDATIONS_REFRESH_ENABLED: v.optional(v.string()),
   },
 });
 

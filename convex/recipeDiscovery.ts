@@ -9,6 +9,7 @@ import { v } from "convex/values";
 import { z } from "zod";
 import { components, internal } from "./_generated/api";
 import { action } from "./_generated/server";
+import { dailyRecommendationRefreshEnabled } from "./lib/featureFlags";
 import { isLikelyIndividualRecipePage } from "./lib/urls";
 import { buildRecipeScrapePayload } from "./lib/recipeScrape";
 
@@ -190,6 +191,14 @@ export const search = action({
       : `best rated recipe ${normalizedTerms.join(" ")}`;
 
     if (isRecommended) {
+      if (!dailyRecommendationRefreshEnabled()) {
+        const cached: DiscoveryResponse | null = await ctx.runQuery(
+          internal.recipeDiscoveryCache.getDailyRecommendations,
+          {},
+        );
+        return cached ?? { query, recipes: [] };
+      }
+
       const dailyCache: DailyCacheClaim = await ctx.runMutation(
         internal.recipeDiscoveryCache.claimDailyRefresh,
         {},

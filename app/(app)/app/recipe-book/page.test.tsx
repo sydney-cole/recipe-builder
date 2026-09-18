@@ -6,6 +6,8 @@ import RecipeBookPage from "./page";
 const queryState = vi.hoisted(() => ({
   value: undefined as unknown,
   createFromRecipe: vi.fn(),
+  push: vi.fn(),
+  search: "",
 }));
 
 vi.mock("convex/react", () => ({
@@ -14,7 +16,8 @@ vi.mock("convex/react", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: queryState.push }),
+  useSearchParams: () => new URLSearchParams(queryState.search),
 }));
 
 const recipes = [
@@ -65,6 +68,9 @@ describe("RecipeBookPage", () => {
 
   beforeEach(() => {
     queryState.value = recipes;
+    queryState.createFromRecipe.mockReset().mockResolvedValue(null);
+    queryState.push.mockReset();
+    queryState.search = "";
   });
 
   it("renders loading and empty states", () => {
@@ -93,5 +99,17 @@ describe("RecipeBookPage", () => {
       "Apple Oats",
       "Zucchini Pasta",
     ]);
+  });
+
+  it("sets a selected recipe as current and returns home in change mode", async () => {
+    const user = userEvent.setup();
+    queryState.search = "select=current";
+    render(<RecipeBookPage />);
+
+    expect(screen.getByRole("heading", { name: "Change current recipe" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Choose Zucchini Pasta" }));
+
+    expect(queryState.createFromRecipe).toHaveBeenCalledWith({ recipeId: "recipe-z" });
+    expect(queryState.push).toHaveBeenCalledWith("/app");
   });
 });

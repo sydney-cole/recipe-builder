@@ -124,6 +124,6 @@ describe("AddRecipeToListButton", () => {
     await user.click(screen.getByRole("button", { name: "No" }));
 
     expect(mocks.mutation).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).toHaveTextContent("New grocery list");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

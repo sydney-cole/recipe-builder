@@ -1,9 +1,9 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { BookOpen, Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { EmptyState } from "@/components/feedback/empty-state";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { recipeArt, recipeTotalMinutes } from "@/lib/data/recipe-view";
 import type { Recipe } from "@/lib/data/types";
 import { filterAndSortRecipes, type RecipeSort } from "@/lib/recipes";
@@ -19,10 +20,27 @@ import { ManualRecipeDialog } from "@/components/recipes/manual-recipe-dialog";
 
 export default function RecipeBookPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const convexRecipes = useQuery(api.recipes.listBook);
+  const setCurrent = useMutation(api.recipeCards.setCurrent);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<RecipeSort>("recent");
   const [manualOpen, setManualOpen] = useState(false);
+  const [selectingRecipeId, setSelectingRecipeId] = useState<string | null>(null);
+  const [selectionError, setSelectionError] = useState(false);
+  const selectingCurrent = searchParams.get("select") === "current";
+
+  async function selectCurrentRecipe(recipeId: string) {
+    setSelectingRecipeId(recipeId);
+    setSelectionError(false);
+    try {
+      await setCurrent({ recipeId: recipeId as Id<"recipes"> });
+      router.push("/app");
+    } catch {
+      setSelectionError(true);
+      setSelectingRecipeId(null);
+    }
+  }
 
   const recipes = useMemo(() => {
     if (convexRecipes === undefined) return undefined;
@@ -45,10 +63,13 @@ export default function RecipeBookPage() {
     <div className="page-container">
       <PageHeader
         eyebrow="Your collection"
-        title="Recipe Book"
-        description="Every recipe you choose to save lives here."
-        actions={<div className="cluster"><Button onClick={() => setManualOpen(true)}><Plus size={17} />Add manually</Button><Button asChild variant="secondary"><Link href="/app/discover">Import recipe</Link></Button></div>}
+        title={selectingCurrent ? "Change current recipe" : "Recipe Book"}
+        description={selectingCurrent ? "Choose a recipe from your book. It will become your current recipe and you’ll return home." : "Every recipe you choose to save lives here."}
+        actions={selectingCurrent
+          ? <Button asChild variant="secondary"><Link href="/app">Cancel</Link></Button>
+          : <div className="cluster"><Button onClick={() => setManualOpen(true)}><Plus size={17} />Add manually</Button><Button asChild variant="secondary"><Link href="/app/discover">Import recipe</Link></Button></div>}
       />
+      {selectionError && <p className="mb-5 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" role="alert">Couldn&apos;t change the current recipe. Please try again.</p>}
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <label className="relative flex-1">
           <span className="sr-only">Search Recipe Book</span>
@@ -85,7 +106,16 @@ export default function RecipeBookPage() {
       ) : recipes.length === 0 ? (
         <EmptyState icon={BookOpen} title="No recipes found" description={search ? "Try a different search." : "Import a recipe to start your collection."} />
       ) : (
-        <div className="grid-auto">{recipes.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} canCreateGroceryList />)}</div>
+        <div className="grid-auto">{recipes.map((recipe) => (
+          <RecipeCard
+            key={recipe.id}
+            recipe={recipe}
+            canCreateGroceryList={!selectingCurrent}
+            onSelect={selectingCurrent ? (recipeId) => void selectCurrentRecipe(recipeId) : undefined}
+            isSelecting={selectingRecipeId === recipe.id}
+            selectionDisabled={selectingRecipeId !== null}
+          />
+        ))}</div>
       )}
       <ManualRecipeDialog open={manualOpen} onOpenChange={setManualOpen} onCreated={(recipeId) => router.push(`/app/recipe-book/${recipeId}`)} />
     </div>

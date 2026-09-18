@@ -13,6 +13,8 @@ import type * as email from "../email.js";
 import type * as groceryLists from "../groceryLists.js";
 import type * as http from "../http.js";
 import type * as lib_agentmail from "../lib/agentmail.js";
+import type * as lib_featureFlags from "../lib/featureFlags.js";
+import type * as lib_firecrawlAgent from "../lib/firecrawlAgent.js";
 import type * as lib_manualIngredient from "../lib/manualIngredient.js";
 import type * as lib_recipeAgentTypes from "../lib/recipeAgentTypes.js";
 import type * as lib_recipeScrape from "../lib/recipeScrape.js";
@@ -42,6 +44,8 @@ declare const fullApi: ApiFromModules<{
   groceryLists: typeof groceryLists;
   http: typeof http;
   "lib/agentmail": typeof lib_agentmail;
+  "lib/featureFlags": typeof lib_featureFlags;
+  "lib/firecrawlAgent": typeof lib_firecrawlAgent;
   "lib/manualIngredient": typeof lib_manualIngredient;
   "lib/recipeAgentTypes": typeof lib_recipeAgentTypes;
   "lib/recipeScrape": typeof lib_recipeScrape;

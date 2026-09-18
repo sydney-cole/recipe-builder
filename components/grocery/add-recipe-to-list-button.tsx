@@ -33,6 +33,11 @@ export function AddRecipeToListButton({ recipeId, size = "default", variant = "d
       )
     : [];
 
+  function closeDialog() {
+    setConfirmingDuplicate(false);
+    setOpen(false);
+  }
+
   async function createNewList(forceNew: boolean) {
     setError(false);
     setIsAdding(true);
@@ -78,7 +83,7 @@ export function AddRecipeToListButton({ recipeId, size = "default", variant = "d
                   : `This recipe is already used by ${recipeLists.length} grocery lists.`}
               </div>
               <div className="mt-6 flex justify-end gap-3">
-                <Button variant="secondary" onClick={() => setConfirmingDuplicate(false)} disabled={isAdding}>No</Button>
+                <Button variant="secondary" onClick={closeDialog} disabled={isAdding}>No</Button>
                 <Button onClick={() => void createNewList(true)} disabled={isAdding}><Plus size={16} />{isAdding ? "Creating…" : "Yes"}</Button>
               </div>
             </>
