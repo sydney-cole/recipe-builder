@@ -25,6 +25,9 @@ describe("RecipeLinkImport", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.queueUrl.mockResolvedValue("import-123");
+    mocks.result.status = "completed";
+    mocks.result.recipeId = "recipe-123";
+    delete (mocks.result as typeof mocks.result & { errorMessage?: string }).errorMessage;
   });
 
   it("shows a pasted recipe result and opens its unsaved preview", async () => {
@@ -56,5 +59,22 @@ describe("RecipeLinkImport", () => {
     await user.click(screen.getByRole("button", { name: "Import recipe" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Check the URL and try again");
+  });
+
+  it("shows the standard import failure when scraping does not produce a recipe", async () => {
+    mocks.result.status = "failed";
+    mocks.result.recipeId = "";
+    (mocks.result as typeof mocks.result & { errorMessage?: string }).errorMessage =
+      "firecrawl_request_failed";
+    const user = userEvent.setup();
+    render(<RecipeLinkImport />);
+
+    await user.type(screen.getByRole("textbox", { name: "Recipe URL" }), "https://example.com/recipe");
+    await user.click(screen.getByRole("button", { name: "Import recipe" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Recipe import failed");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "We couldn’t scrape a complete recipe from that website.",
+    );
   });
 });

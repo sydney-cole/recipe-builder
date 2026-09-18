@@ -1,6 +1,6 @@
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { fetchQuery } from "convex/nextjs";
-import { ArrowLeft, Clock3, ExternalLink, Users } from "lucide-react";
+import { ArrowLeft, Clock3, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FoodArt } from "@/components/recipes/food-art";
@@ -64,14 +64,8 @@ export default async function RecipePreviewPage({
               <Users className="inline" size={17} /> {servings || "—"} servings
             </span>
           </div>
-          <div className="mt-7 stack">
-            <RecipePreviewActions recipeId={recipe._id} isSaved={saved !== null} />
-            <Button asChild variant="secondary" className="w-fit">
-              <a href={recipe.sourceUrl} target="_blank" rel="noreferrer">
-                <ExternalLink size={17} />
-                View original
-              </a>
-            </Button>
+          <div className="mt-7">
+            <RecipePreviewActions recipeId={recipe._id} isSaved={saved !== null} sourceUrl={recipe.sourceUrl} />
           </div>
         </div>
       </div>

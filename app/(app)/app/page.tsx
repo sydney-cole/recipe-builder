@@ -29,8 +29,8 @@ const quickActions = [
   {
     href: "/app/imports",
     icon: Inbox,
-    label: "Inboxes",
-    detail: "Connect your recipe inbox",
+    label: "Recipe Inbox",
+    detail: "Forward recipes by email",
   },
   {
     href: "/app/grocery-lists",

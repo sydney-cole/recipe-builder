@@ -19,7 +19,28 @@ describe("RecipePreviewActions", () => {
 
   it("saves the preview and opens the Recipe Book", async () => {
     const user = userEvent.setup();
-    render(<RecipePreviewActions recipeId={"recipe-1" as never} isSaved={false} />);
+    const { container } = render(
+      <RecipePreviewActions
+        recipeId={"recipe-1" as never}
+        isSaved={false}
+        sourceUrl="https://example.com/recipe"
+      />,
+    );
+
+    expect(container.querySelector(".recipe-preview-actions")).toHaveClass(
+      "grid",
+      "sm:grid-cols-2",
+    );
+    for (const name of ["Add to Recipe Book", "Set as current", "Add to grocery list", "View original"]) {
+      expect(screen.getByRole(name === "View original" ? "link" : "button", { name })).toHaveClass(
+        "h-full",
+        "w-full",
+      );
+    }
+    expect(screen.getByRole("link", { name: "View original" })).toHaveAttribute(
+      "href",
+      "https://example.com/recipe",
+    );
 
     await user.click(screen.getByRole("button", { name: "Add to Recipe Book" }));
 

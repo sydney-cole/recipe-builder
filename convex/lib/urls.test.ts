@@ -3,6 +3,7 @@ import {
   isPublicUrlHostname,
   isLikelyIndividualRecipePage,
   normalizeRecipeUrl,
+  primaryRecipeLinkFromMessage,
   recipeLinksFromMessage,
 } from "./urls";
 
@@ -54,6 +55,8 @@ describe("normalizeRecipeUrl", () => {
 
 describe("isLikelyIndividualRecipePage", () => {
   it.each([
+    ["https://example.com/", "Example"],
+    ["https://mypronouns.org/she", "Pronouns"],
     ["https://example.com/collection/our-best-recipes/", "Our best recipes"],
     ["https://example.com/25-most-popular-recipes-of-2025/", "25 Most Popular Recipes"],
     ["https://example.com/category/dinner/", "Dinner recipes"],
@@ -87,5 +90,17 @@ describe("recipeLinksFromMessage", () => {
     ).join(" ");
     expect(recipeLinksFromMessage({ text })).toHaveLength(10);
     expect(recipeLinksFromMessage(null)).toEqual([]);
+  });
+});
+
+describe("primaryRecipeLinkFromMessage", () => {
+  it("chooses one recipe URL and ignores homepage and signature links", () => {
+    expect(primaryRecipeLinkFromMessage({
+      text: [
+        "https://thecozycook.com/garlic-butter-pasta/",
+        "http://mypronouns.org/she",
+        "https://atomicobject.com/",
+      ].join(" "),
+    })).toEqual(["https://thecozycook.com/garlic-butter-pasta/"]);
   });
 });

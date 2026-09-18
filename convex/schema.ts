@@ -59,6 +59,24 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_inbox", ["inboxId"]),
 
+  // A user-visible summary of each email delivered to a recipe inbox. Full
+  // message bodies remain isolated inside the AgentMail component; this table
+  // stores only the bounded metadata needed by the Inboxes page.
+  inboundRecipeEmails: defineTable({
+    userId: v.id("users"),
+    inboxId: v.string(),
+    eventId: v.string(),
+    messageId: v.optional(v.string()),
+    sender: v.optional(v.string()),
+    subject: v.optional(v.string()),
+    receivedAt: v.number(),
+    linkCount: v.number(),
+    queuedCount: v.number(),
+    primaryImportId: v.optional(v.id("recipeImports")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_event", ["eventId"]),
+
   // One attempt to turn a URL into a recipe. Keeping jobs separate from the
   // finished recipe makes retries and user-visible scrape errors easy to track.
   recipeImports: defineTable({

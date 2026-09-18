@@ -38,7 +38,7 @@ export function CurrentRecipeButton({
 
   return (
     <div className={className}>
-      <Button className="w-full" size={size} variant={isCurrent ? "secondary" : (variant ?? "default")} disabled={isCurrent || isSetting || currentId === undefined} onClick={() => void select()}>
+      <Button className="h-full w-full" size={size} variant={isCurrent ? "secondary" : (variant ?? "default")} disabled={isCurrent || isSetting || currentId === undefined} onClick={() => void select()}>
         {isCurrent ? <Check size={16} /> : <CookingPot size={16} />}
         {isCurrent ? "Current recipe" : isSetting ? "Setting…" : "Set as current"}
       </Button>

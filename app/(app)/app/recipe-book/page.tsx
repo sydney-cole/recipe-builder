@@ -100,13 +100,13 @@ export default function RecipeBookPage() {
         </label>
       </div>
       {recipes === undefined ? (
-        <div className="grid-auto" aria-label="Loading recipes">
+        <div className="recipe-book-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading recipes">
           {[0, 1, 2].map((item) => <Skeleton className="h-96" key={item} />)}
         </div>
       ) : recipes.length === 0 ? (
         <EmptyState icon={BookOpen} title="No recipes found" description={search ? "Try a different search." : "Import a recipe to start your collection."} />
       ) : (
-        <div className="grid-auto">{recipes.map((recipe) => (
+        <div className="recipe-book-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{recipes.map((recipe) => (
           <RecipeCard
             key={recipe.id}
             recipe={recipe}

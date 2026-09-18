@@ -1,29 +1,121 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import {
-  action,
   internalMutation,
-  internalQuery,
   mutation,
   query,
 } from "./_generated/server";
-import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import {
   optionalStringField,
-  recipeLinksFromMessage,
+  primaryRecipeLinkFromMessage,
 } from "./lib/urls";
-import { agentmail } from "./lib/agentmail";
 import { queueRecipeSource } from "./recipeIngestion";
+
+const inboundEmailStatus = v.union(
+  v.literal("received"),
+  v.literal("processing"),
+  v.literal("imported"),
+  v.literal("needs_review"),
+  v.literal("failed"),
+  v.literal("no_links"),
+  v.literal("already_imported"),
+);
+
+function boundedField(value: unknown, key: string, maxLength: number) {
+  return optionalStringField(value, key)?.trim().slice(0, maxLength) || undefined;
+}
+
+function messageTimestamp(message: unknown) {
+  const timestamp = optionalStringField(message, "timestamp");
+  if (timestamp === undefined) return Date.now();
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
+function senderEmail(message: unknown) {
+  const rawSender = optionalStringField(message, "from")?.trim().toLowerCase();
+  if (!rawSender) return undefined;
+  const bracketedAddress = rawSender.match(/<([^<>]+)>/)?.[1]?.trim();
+  const address = bracketedAddress ?? rawSender;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address) ? address : undefined;
+}
 
 export const currentInbox = query({
   args: {},
+  returns: v.union(v.null(), v.object({ email: v.string() })),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (userId === null) return null;
-    return await ctx.db
-      .query("userInboxes")
+    const email = process.env.AGENTMAIL_INBOX_ID?.trim();
+    return email ? { email } : null;
+  },
+});
+
+export const recentInboundEmails = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("inboundRecipeEmails"),
+      subject: v.optional(v.string()),
+      sender: v.optional(v.string()),
+      receivedAt: v.number(),
+      linkCount: v.number(),
+      status: inboundEmailStatus,
+      recipeId: v.optional(v.id("recipes")),
+    }),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) return [];
+
+    const emails = await ctx.db
+      .query("inboundRecipeEmails")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
+      .order("desc")
+      .take(20);
+
+    return await Promise.all(
+      emails.map(async (email) => {
+        // Only expose a recipe through the import explicitly selected for this
+        // email. Older multi-link events may contain unrelated successful or
+        // failed attempts and must not borrow a button from event history.
+        const primaryImport = email.primaryImportId === undefined
+          ? null
+          : await ctx.db.get(email.primaryImportId);
+        const ownedPrimaryImport = primaryImport?.requestedBy === userId
+          ? primaryImport
+          : null;
+        const recipeId = ownedPrimaryImport?.recipeId;
+        let status:
+          | "received"
+          | "processing"
+          | "imported"
+          | "needs_review"
+          | "failed"
+          | "no_links"
+          | "already_imported";
+
+        if (email.linkCount === 0) status = "no_links";
+        else if (ownedPrimaryImport?.status === "failed") status = "failed";
+        else if (ownedPrimaryImport !== null && !["completed", "needs_review"].includes(ownedPrimaryImport.status)) status = "processing";
+        else if (email.queuedCount === 0) status = "already_imported";
+        else if (ownedPrimaryImport === null) status = "failed";
+        else if (ownedPrimaryImport.status === "needs_review" && recipeId !== undefined) status = "needs_review";
+        else if (ownedPrimaryImport.status === "completed" && recipeId !== undefined) status = "imported";
+        else status = "failed";
+
+        return {
+          _id: email._id,
+          subject: email.subject,
+          sender: email.sender,
+          receivedAt: email.receivedAt,
+          linkCount: email.linkCount,
+          status,
+          recipeId,
+        };
+      }),
+    );
   },
 });
 
@@ -99,81 +191,6 @@ export const queueUrl = mutation({
   },
 });
 
-export const inboxForUser = internalQuery({
-  args: { userId: v.id("users") },
-  handler: async (ctx, { userId }) =>
-    await ctx.db
-      .query("userInboxes")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique(),
-});
-
-export const saveInbox = internalMutation({
-  args: {
-    userId: v.id("users"),
-    inboxId: v.string(),
-    email: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("userInboxes")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .unique();
-    if (existing !== null) return existing;
-
-    const claimedInbox = await ctx.db
-      .query("userInboxes")
-      .withIndex("by_inbox", (q) => q.eq("inboxId", args.inboxId))
-      .unique();
-    if (claimedInbox !== null) {
-      throw new Error("This recipe inbox is already connected to an account");
-    }
-
-    const now = Date.now();
-    const id = await ctx.db.insert("userInboxes", {
-      ...args,
-      createdAt: now,
-      updatedAt: now,
-    });
-    return await ctx.db.get(id);
-  },
-});
-
-export const provisionInbox = action({
-  args: {},
-  handler: async (ctx): Promise<{ email: string }> => {
-    const userId = await getAuthUserId(ctx);
-    if (userId === null) throw new Error("Unauthenticated");
-
-    const existing = await ctx.runQuery(internal.email.inboxForUser, { userId });
-    if (existing !== null) return { email: existing.email };
-
-    const configuredInboxId = process.env.AGENTMAIL_INBOX_ID?.trim();
-    if (!configuredInboxId) {
-      throw new Error("AGENTMAIL_INBOX_ID is not configured");
-    }
-
-    const remoteInbox = (await agentmail.getInbox(ctx, configuredInboxId)) as {
-      inbox_id?: unknown;
-      email?: unknown;
-    };
-    if (
-      typeof remoteInbox.inbox_id !== "string" ||
-      typeof remoteInbox.email !== "string"
-    ) {
-      throw new Error("AgentMail returned invalid inbox metadata");
-    }
-
-    const saved = await ctx.runMutation(internal.email.saveInbox, {
-      userId,
-      inboxId: remoteInbox.inbox_id,
-      email: remoteInbox.email,
-    });
-    if (saved === null) throw new Error("Could not save the new inbox");
-    return { email: saved.email };
-  },
-});
-
 export const onMessageReceived = internalMutation({
   args: { message: v.any(), thread: v.any(), eventId: v.string() },
   returns: v.object({ queued: v.number() }),
@@ -183,36 +200,58 @@ export const onMessageReceived = internalMutation({
     const inboxId = optionalStringField(message, "inbox_id");
     if (inboxId === undefined) return { queued: 0 };
 
-    const userInbox = await ctx.db
-      .query("userInboxes")
-      .withIndex("by_inbox", (q) => q.eq("inboxId", inboxId))
+    const configuredInboxId = process.env.AGENTMAIL_INBOX_ID?.trim();
+    if (!configuredInboxId || inboxId.toLowerCase() !== configuredInboxId.toLowerCase()) {
+      return { queued: 0 };
+    }
+
+    const fromAddress = senderEmail(message);
+    if (fromAddress === undefined) return { queued: 0 };
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", fromAddress))
       .unique();
-    if (userInbox === null) return { queued: 0 };
+    if (user === null) return { queued: 0 };
 
     const alreadyHandled = await ctx.db
-      .query("recipeImports")
-      .withIndex("by_source_event", (q) =>
-        q.eq("sourceEventId", sourceEventId),
-      )
-      .first();
+      .query("inboundRecipeEmails")
+      .withIndex("by_event", (q) => q.eq("eventId", sourceEventId))
+      .unique();
     if (alreadyHandled !== null) return { queued: 0 };
 
-    const sourceMessageId = optionalStringField(message, "message_id");
-    const sourceSubject = optionalStringField(message, "subject");
-    const links = recipeLinksFromMessage(message);
+    const sourceMessageId = boundedField(message, "message_id", 500);
+    const sourceSubject = boundedField(message, "subject", 300);
+    // Forwarded messages commonly contain unrelated links in signatures and
+    // footers. Import only the first plausible recipe page from each email.
+    const links = primaryRecipeLinkFromMessage(message);
     let queued = 0;
+    let primaryImportId: Id<"recipeImports"> | undefined;
 
     for (const normalizedUrl of links) {
       const result = await queueRecipeSource(ctx, {
-        userId: userInbox.userId,
+        userId: user._id,
         sourceUrl: normalizedUrl,
         sourceKind: "email",
         sourceMessageId,
         sourceEventId,
         sourceSubject,
       });
+      primaryImportId ??= result.importId;
       if (result.queued) queued += 1;
     }
+
+    await ctx.db.insert("inboundRecipeEmails", {
+      userId: user._id,
+      inboxId,
+      eventId: sourceEventId,
+      messageId: sourceMessageId,
+      sender: boundedField(message, "from", 320),
+      subject: sourceSubject,
+      receivedAt: messageTimestamp(message),
+      linkCount: links.length,
+      queuedCount: queued,
+      primaryImportId,
+    });
 
     return { queued };
   },

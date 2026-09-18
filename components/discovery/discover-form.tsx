@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useMutation } from "convex/react";
-import { BookPlus, Clock3, ExternalLink, Search, Sparkles, Star, X } from "lucide-react";
+import { BookPlus, Clock3, ExternalLink, LoaderCircle, Search, Sparkles, Star, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { RecipeLinkImport } from "@/components/discovery/recipe-link-import";
@@ -13,11 +13,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
-import {
-  DISCOVERY_DEMO_MODE,
-  isTemporaryDemoRecipe,
-  TEMPORARY_DISCOVERY_RECIPES,
-} from "@/lib/data/temporary-discovery-demo";
 
 const starters = ["chicken thighs", "broccoli", "cozy", "30-minute dinner"];
 const MAX_VISIBLE_TERMS = 6;
@@ -46,14 +41,12 @@ export function DiscoverForm() {
   const createPreview = useMutation(api.recipePreviews.createFromDiscovery);
   const [query, setQuery] = useState("");
   const [terms, setTerms] = useState<string[]>([]);
-  const [results, setResults] = useState<DiscoveryRecipe[]>(
-    DISCOVERY_DEMO_MODE ? TEMPORARY_DISCOVERY_RECIPES : [],
-  );
+  const [results, setResults] = useState<DiscoveryRecipe[]>([]);
   const [searchResults, setSearchResults] = useState<DiscoveryRecipe[]>([]);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [searched, setSearched] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
-  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(!DISCOVERY_DEMO_MODE);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
   const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
   const [detailRecipe, setDetailRecipe] = useState<DiscoveryRecipe | null>(null);
   const [error, setError] = useState("");
@@ -65,9 +58,6 @@ export function DiscoverForm() {
   useEffect(() => {
     if (hasLoadedRecommendations.current) return;
     hasLoadedRecommendations.current = true;
-
-    // TEMPORARY DEMO MODE: bypass Firecrawl while test credits are unavailable.
-    if (DISCOVERY_DEMO_MODE) return;
 
     const version = ++requestVersion.current;
     void searchRecipes({ terms: [], mode: "recommended" })
@@ -123,22 +113,6 @@ export function DiscoverForm() {
     setSearched(true);
     setSearchResults([]);
     setSearchDialogOpen(true);
-
-    // TEMPORARY DEMO MODE: search the local fixtures without a Firecrawl call.
-    if (DISCOVERY_DEMO_MODE) {
-      const matchingRecipes = TEMPORARY_DISCOVERY_RECIPES.filter((recipe) => {
-        const searchableText = [
-          recipe.title,
-          recipe.description,
-          ...recipe.matchedTerms,
-          ...recipe.ingredients,
-        ].join(" ").toLowerCase();
-        return nextTerms.some((term) => searchableText.includes(term));
-      });
-      setSearchResults(matchingRecipes.length > 0 ? matchingRecipes : TEMPORARY_DISCOVERY_RECIPES);
-      setIsSearching(false);
-      return;
-    }
 
     try {
       const response = await searchRecipes({ terms: nextTerms, mode: "search" });
@@ -243,12 +217,8 @@ export function DiscoverForm() {
       <section className="discovery-recommendations" aria-labelledby="matches-title" aria-live="polite">
         <div className="section-row">
           <div>
-            <h2 id="matches-title" className="section-heading">{DISCOVERY_DEMO_MODE ? "Demo recipes" : "Recommended recipes"}</h2>
-            <p className="section-copy">
-              {DISCOVERY_DEMO_MODE
-                ? "Temporary complete recipes for testing without using Firecrawl credits."
-                : "Up to three highly rated recipes from the web, selected and explained by the PerfectPlate agent."}
-            </p>
+            <h2 id="matches-title" className="section-heading">Recommended recipes</h2>
+            <p className="section-copy">Up to three highly rated recipes from the web, selected and explained by the PerfectPlate agent.</p>
           </div>
           {searched && !isLoadingResults && <span className="text-sm font-bold text-primary">{results.length} {results.length === 1 ? "recipe" : "recipes"}</span>}
         </div>
@@ -275,11 +245,7 @@ export function DiscoverForm() {
                   <p className="rounded-lg bg-primary-soft p-3 text-sm leading-5 text-primary"><strong>Why it fits:</strong> {recipe.matchReason}</p>
                   {recipe.matchedTerms.length > 0 && <div className="cluster">{recipe.matchedTerms.map((term) => <Badge key={term}>{term}</Badge>)}</div>}
                   <Button onClick={() => setDetailRecipe(recipe)}><BookPlus size={16} />View recipe</Button>
-                  {isTemporaryDemoRecipe(recipe.url) ? (
-                    <span className="text-xs text-muted-foreground">Source: {recipe.source}</span>
-                  ) : (
-                    <a className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4" href={recipe.url} target="_blank" rel="noreferrer">Source: {recipe.source} <ExternalLink size={12} aria-hidden /></a>
-                  )}
+                  <a className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-4" href={recipe.url} target="_blank" rel="noreferrer">Source: {recipe.source} <ExternalLink size={12} aria-hidden /></a>
                 </CardContent>
               </Card>
             ))}
@@ -300,10 +266,16 @@ export function DiscoverForm() {
             Select one result to open its full recipe page. It will not be added to your Recipe Book unless you save it there.
           </DialogDescription>
           {isSearching ? (
-            <div className="mt-6 grid-auto" aria-label="Searching for recipe matches">
-              {[0, 1, 2].map((item) => (
-                <Skeleton className="h-64" key={item} />
-              ))}
+            <div className="mt-6" aria-label="Searching for recipe matches">
+              <div className="mb-5 flex items-center justify-center gap-3 rounded-xl bg-primary-soft p-4 text-primary" role="status" aria-live="polite">
+                <LoaderCircle className="animate-spin" size={22} aria-hidden />
+                <span className="font-bold">Searching and scraping recipe pages…</span>
+              </div>
+              <div className="grid-auto" aria-hidden="true">
+                {[0, 1, 2].map((item) => (
+                  <Skeleton className="h-64" key={item} />
+                ))}
+              </div>
             </div>
           ) : searchResultsError ? (
             <Alert className="mt-6 border-red-300 bg-red-50 text-red-900" role="alert">
@@ -371,11 +343,9 @@ export function DiscoverForm() {
                 <BookPlus size={16} />
                 {selectedUrl === detailRecipe.url ? "Opening…" : "Choose recipe"}
               </Button>
-              {!isTemporaryDemoRecipe(detailRecipe.url) && (
-                <Button asChild variant="secondary">
-                  <a href={detailRecipe.url} target="_blank" rel="noreferrer"><ExternalLink size={16} />View original</a>
-                </Button>
-              )}
+              <Button asChild variant="secondary">
+                <a href={detailRecipe.url} target="_blank" rel="noreferrer"><ExternalLink size={16} />View original</a>
+              </Button>
             </div>
           </DialogContent>
         )}

@@ -87,6 +87,10 @@ describe("RecipeBookPage", () => {
     const user = userEvent.setup();
     render(<RecipeBookPage />);
     expect(screen.getByText("2 recipes")).toBeInTheDocument();
+    expect(screen.getByText("2 recipes").parentElement?.nextElementSibling).toHaveClass(
+      "recipe-book-grid",
+      "xl:grid-cols-3",
+    );
 
     await user.type(screen.getByPlaceholderText("Search your Recipe Book"), "morning");
     expect(screen.getByText("1 recipe")).toBeInTheDocument();

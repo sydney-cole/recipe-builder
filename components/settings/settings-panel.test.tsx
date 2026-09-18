@@ -6,7 +6,6 @@ import { SettingsPanel } from "./settings-panel";
 const mocks = vi.hoisted(() => ({
   updateProfile: vi.fn(),
   updatePreferences: vi.fn(),
-  provisionInbox: vi.fn(),
 }));
 
 vi.mock("@/convex/_generated/api", () => ({
@@ -16,25 +15,20 @@ vi.mock("@/convex/_generated/api", () => ({
       updateProfile: "updateProfile",
       updateNotificationPreferences: "updateNotificationPreferences",
     },
-    email: { currentInbox: "currentInbox", provisionInbox: "provisionInbox" },
   },
 }));
 
 vi.mock("convex/react", () => ({
-  useQuery: (reference: string) => reference === "currentUser"
-    ? { _id: "user-1", name: "Ada Lovelace", email: "ada@example.com" }
-    : { _id: "inbox-1", email: "recipes@example.com" },
+  useQuery: () => ({ _id: "user-1", name: "Ada Lovelace", email: "ada@example.com" }),
   useMutation: (reference: string) => reference === "updateProfile"
     ? mocks.updateProfile
     : mocks.updatePreferences,
-  useAction: () => mocks.provisionInbox,
 }));
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
     mocks.updateProfile.mockReset().mockResolvedValue(null);
     mocks.updatePreferences.mockReset().mockResolvedValue(null);
-    mocks.provisionInbox.mockReset().mockResolvedValue({ email: "recipes@example.com" });
   });
 
   it("loads the signed-in profile and saves a normalized name", async () => {
@@ -65,11 +59,5 @@ describe("SettingsPanel", () => {
       },
     });
     expect(await screen.findByText("Preferences saved.")).toBeInTheDocument();
-  });
-
-  it("shows the connected recipe inbox", () => {
-    render(<SettingsPanel />);
-    expect(screen.getByText("recipes@example.com")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy address" })).toBeInTheDocument();
   });
 });

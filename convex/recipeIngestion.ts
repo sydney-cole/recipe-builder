@@ -108,7 +108,13 @@ export async function queueRecipeSource(
         });
       }
     }
-    if (existing.status === "failed" || existing.workflowId === undefined) {
+    // A failed normalized URL remains failed across every entry point. This
+    // prevents an email forward from spending credits retrying a site that the
+    // Discover importer already proved could not produce a complete recipe.
+    if (existing.status === "failed") {
+      return { importId: existing._id, queued: false };
+    }
+    if (existing.workflowId === undefined) {
       const workflowId = await startRecipeIngestion(ctx, existing._id);
       await ctx.db.patch(existing._id, {
         workflowId,

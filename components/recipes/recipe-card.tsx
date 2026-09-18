@@ -101,10 +101,10 @@ export function RecipeCard({
         {recipe.matchReason && <p className="rounded-lg bg-primary-soft p-3 text-sm leading-5 text-primary"><strong>Why it fits:</strong> {recipe.matchReason}</p>}
         {recipe.missingIngredients && <p className="text-xs text-muted-foreground">Missing: {recipe.missingIngredients.join(", ")}</p>}
         <div className="cluster">{recipe.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="recipe-card-actions grid grid-cols-1 gap-2 sm:grid-cols-2">
           {!saved && <Button className="w-full" size="sm" onClick={() => void save()} disabled={isSaving}><BookPlus size={16} />{isSaving ? "Adding…" : "Add to Recipe Book"}</Button>}
           <CurrentRecipeButton className="w-full" recipeId={recipe.id} variant="secondary" />
-          {(canCreateGroceryList || (suggested && saved)) && <AddRecipeToListButton className="w-full whitespace-nowrap" recipeId={recipe.id} size="sm" />}
+          {(canCreateGroceryList || (suggested && saved)) && <AddRecipeToListButton className="recipe-card-grocery-action w-full" recipeId={recipe.id} size="sm" />}
         </div>
         {saveError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t add this recipe to your book. Try again.</p>}
         <p className="text-xs text-muted-foreground">Source: {recipe.source}</p>

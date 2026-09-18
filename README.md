@@ -1,10 +1,11 @@
 # PerfectPlate
 
 PerfectPlate is an email-powered recipe organizer and meal-planning application.
-The current implementation provides a frontend built with Next.js, TypeScript,
-Tailwind CSS, and shadcn-style UI components. Account access and the Recipe Book
-are connected to Convex; discovery and subscription flows still use local mock
-data while their backend integrations are being built.
+The application uses Next.js, TypeScript, Tailwind CSS, and shadcn-style UI
+components with Convex for authentication, realtime data, durable recipe
+ingestion, and grocery-list workflows. Firecrawl powers live recipe discovery
+and extraction, OpenAI structures recipe cards, and AgentMail receives recipes
+forwarded to a shared inbox.
 
 For the public hackathon deployment, follow the
 [ChatGPT Sites deployment runbook](./CHATGPT_SITES.md). The hosted Site keeps
@@ -80,37 +81,43 @@ pull requests.
 The frontend currently includes the following responsive, navigable flows:
 
 - **Marketing and authentication:** landing page plus working password-based
-  sign-in and sign-up screens backed by Convex Auth. Application routes require
-  an authenticated session.
-- **Application shell:** responsive desktop sidebar, top navigation, and a
-  five-item mobile bottom navigation.
-- **Dashboard:** quick access to recipe discovery, email imports, grocery lists,
-  and realtime recently saved recipes.
-- **Recipe discovery:** search scaffolding for ingredients, moods, and recipe
-  types, including removable search terms and explained mock recommendations.
+  sign-in, sign-up, and emailed password-recovery screens backed by Convex Auth.
+  Application routes require an authenticated session.
+- **Application shell:** responsive desktop sidebar and five-item mobile bottom
+  navigation. Recipe Inbox lives with the primary destinations; Log out and
+  Settings are grouped at the bottom of the desktop sidebar.
+- **Dashboard:** quick access to discovery, the shared Recipe Inbox, grocery
+  lists, recent recipes, and a current recipe that can be viewed, changed, or
+  cleared.
+- **Recipe discovery:** live Firecrawl search for ingredients, moods, and recipe
+  types, with removable search terms, an in-dialog scraping indicator, up to
+  three selectable results, and cached daily recommendations. Automatic daily
+  refresh can be paused without disabling manual searches or URL imports.
 - **Recipe Book:** Convex-backed, searchable and sortable recipe gallery with
-  links to detailed recipe pages and their ingredients and instructions.
+  a three-column desktop layout, detailed recipe pages, and a selection mode for
+  changing the current recipe.
 - **Recipe details:** ingredients, cooking instructions, working serving
-  controls, source attribution, and on-demand grocery-list creation.
-- **Recipe importing:** authenticated users can provision an AgentMail inbox,
-  email or paste recipe links, and see Convex-backed import states. Inbound
-  AgentMail webhooks are verified and deduplicated by the component. Firecrawl
-  extracts queued links before the OpenAI recipe agent creates saved cards.
-- **Food-blog subscriptions:** add and manage mock food-blog/newsletter
-  subscriptions with active, pending, and paused states.
+  controls, source attribution, equally sized save/current/grocery/source
+  actions, and duplicate-grocery-list confirmation.
+- **Recipe importing:** authenticated users can paste recipe links on Discover
+  or forward recipe emails to one configured AgentMail inbox. The Recipe Inbox
+  shows received and processing states, successful recipe previews, and clear
+  failures. One plausible recipe URL is selected per email, inbound events and
+  notifications are deduplicated, and the same URL validation and failure rules
+  apply to both direct and email imports. Firecrawl extracts the page before the
+  OpenAI recipe agent creates a structured preview; the recipe enters the Recipe
+  Book only when the user explicitly saves it.
 - **Grocery lists:** list overview plus an interactive editor that can add,
   rename, check off, remove, restore, and change the quantity or unit of grocery
   items. Users can create recipe-named lists from saved recipe ingredients,
   merge two lists into a user-named replacement, delete a list, and save new or
   existing lists atomically to Convex.
-- **Settings:** frontend controls for profile details, recipe inbox information,
-  and notification preferences.
+- **Settings:** frontend controls for profile details and notification
+  preferences.
 - **Design-system states:** responsive layouts, accessible focus behavior,
   loading skeletons, status badges, alerts, dialogs, empty-state scaffolding,
   and a custom not-found page.
 
-Subscriptions, discovery suggestions, and the example "This week" grocery card
-still use some data from `lib/data/mock-data.ts`.
 Generated recipe lists and manually created lists use the Convex-backed editor;
 see `FRONTEND_DESIGN_GAPS.md` for remaining design decisions.
 
@@ -176,12 +183,12 @@ developer or deployment must configure its own Convex environment variables.
 ### OpenAI recipe agent
 
 After Firecrawl stores a recipe artifact, the Convex Agent component uses an
-OpenAI model through OpenAI's API directly. It creates an editable recipe card,
-saves it to the importing user's Recipe Book, and stores its structured
-ingredients. A separate grocery list is created from the non-optional
-ingredients only when the user selects **Create list** on that recipe. Agent
-threads and messages are still persisted by the Convex Agent component, while
-normalized recipe and grocery data lives in the application's Convex tables.
+OpenAI model through OpenAI's API directly. It creates an editable recipe
+preview and stores its structured ingredients. The user can then save it to the
+Recipe Book, set it as current, or create a grocery list from its non-optional
+ingredients. Agent threads and messages are still persisted by the Convex Agent
+component, while normalized recipe and grocery data lives in the application's
+Convex tables.
 
 Create an OpenAI API key and store it only on the Convex deployment:
 
@@ -219,12 +226,11 @@ verifies inbound webhook signatures, and routes recipe links into the
 `recipeImports` table.
 
 Open the [AgentMail console](https://console.agentmail.to) and select the
-AgentMail account that will send PerfectPlate email. Create an API key, then
-open **Inboxes** and either select an existing inbox or create one. Copy its
-inbox ID, which is usually the inbox email address (for example,
-`perfectplate@agentmail.to`). The inbox and API key must belong to the same
-AgentMail account; otherwise AgentMail returns `404 Inbox not found` when the
-application tries to send mail.
+AgentMail account used by PerfectPlate. Create an API key, then select the
+shared PerfectPlate inbox. Copy its inbox ID, which is usually the inbox email
+address (`perfectplate@agentmail.to`). The inbox and API key must belong to the
+same AgentMail account; otherwise AgentMail returns `404 Inbox not found` when
+the application tries to send mail.
 
 Store both values directly on the Convex development deployment. Omit each
 value from the command so the CLI prompts for it without placing the secret in
@@ -243,13 +249,16 @@ npx convex env set AGENTMAIL_API_KEY --deployment <deployment-name>
 npx convex env set AGENTMAIL_INBOX_ID --deployment <deployment-name>
 ```
 
-PerfectPlate uses this configured inbox both for recipe-email intake and for
-sending password-reset codes. After changing either value, run
+PerfectPlate uses this single configured inbox for forwarded recipes and for
+sending password-reset codes. It never creates AgentMail inboxes automatically.
+Users should forward recipes from the email address they use to sign in so the
+inbound webhook can privately associate each message with the correct account.
+After changing either value, run
 `npx convex dev --once` so the development backend is refreshed before testing
 email delivery.
 
-Start the application, create an account, and use **Connect recipe inbox** on
-the imports page. Then register this endpoint in the AgentMail console:
+Register this endpoint in the AgentMail console so forwarded messages reach the
+application:
 
 ```text
 https://<your-convex-site>/agentmail/webhook

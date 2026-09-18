@@ -1,7 +1,7 @@
 "use client";
 
-import { useAction, useMutation, useQuery } from "convex/react";
-import { Bell, Check, Clipboard, Inbox, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
+import { Bell, ShieldCheck, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,6 @@ const defaultPreferences: NotificationPreferences = {
 
 export function SettingsPanel() {
   const user = useQuery(api.users.current);
-  const inbox = useQuery(api.email.currentInbox);
 
   if (user === undefined) {
     return (
@@ -47,24 +46,16 @@ export function SettingsPanel() {
     );
   }
 
-  return <SettingsContent key={user._id} user={user} inbox={inbox} />;
+  return <SettingsContent key={user._id} user={user} />;
 }
 
-function SettingsContent({
-  user,
-  inbox,
-}: {
-  user: Doc<"users">;
-  inbox: Doc<"userInboxes"> | null | undefined;
-}) {
+function SettingsContent({ user }: { user: Doc<"users"> }) {
   const updateProfile = useMutation(api.users.updateProfile);
   const updateNotificationPreferences = useMutation(api.users.updateNotificationPreferences);
-  const provisionInbox = useAction(api.email.provisionInbox);
   const [name, setName] = useState(user.name ?? "");
   const [preferences, setPreferences] = useState(user.notificationPreferences ?? defaultPreferences);
   const [profileState, setProfileState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [notificationState, setNotificationState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [inboxState, setInboxState] = useState<"idle" | "connecting" | "copied" | "error">("idle");
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -94,27 +85,6 @@ function SettingsContent({
     } catch {
       setPreferences(previous);
       setNotificationState("error");
-    }
-  }
-
-  async function connectInbox() {
-    setInboxState("connecting");
-    try {
-      await provisionInbox();
-      setInboxState("idle");
-    } catch {
-      setInboxState("error");
-    }
-  }
-
-  async function copyInbox() {
-    if (!inbox) return;
-    try {
-      await navigator.clipboard.writeText(inbox.email);
-      setInboxState("copied");
-      window.setTimeout(() => setInboxState("idle"), 1800);
-    } catch {
-      setInboxState("error");
     }
   }
 
@@ -150,31 +120,6 @@ function SettingsContent({
               {profileState === "error" && <p className="text-sm font-bold text-red-700" role="alert">Enter a name and try again.</p>}
             </div>
           </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent>
-          <div className="flex gap-3">
-            <Mail className="shrink-0 text-primary" />
-            <div><h2 className="section-heading">Recipe inbox</h2><p className="section-copy">Forward recipe emails to your personal intake address.</p></div>
-          </div>
-          {inbox === undefined ? <Skeleton className="mt-5 h-16" /> : inbox === null ? (
-            <div className="mt-5 rounded-lg bg-surface-subtle p-4">
-              <p className="text-sm font-bold">No recipe inbox is connected yet.</p>
-              <Button className="mt-3" onClick={connectInbox} disabled={inboxState === "connecting"}>
-                <Inbox size={17} />{inboxState === "connecting" ? "Connecting…" : "Connect recipe inbox"}
-              </Button>
-            </div>
-          ) : (
-            <div className="mt-5 flex flex-col gap-2 rounded-lg bg-surface-subtle p-3 sm:flex-row sm:items-center">
-              <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap px-1 text-sm font-bold">{inbox.email}</code>
-              <Button variant="secondary" onClick={copyInbox}>
-                {inboxState === "copied" ? <Check size={17} /> : <Clipboard size={17} />}{inboxState === "copied" ? "Copied" : "Copy address"}
-              </Button>
-            </div>
-          )}
-          {inboxState === "error" && <p className="mt-3 text-sm font-bold text-red-700" role="alert">We couldn’t access the recipe inbox. Try again.</p>}
         </CardContent>
       </Card>
 

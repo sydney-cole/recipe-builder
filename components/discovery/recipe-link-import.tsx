@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { announceRecipeImport } from "@/lib/recipe-import-events";
+import { recipeImportFailureMessage } from "@/lib/recipe-import-errors";
 
 export function RecipeLinkImport() {
   const router = useRouter();
@@ -82,7 +83,7 @@ export function RecipeLinkImport() {
           {importResult?.status === "failed" ? (
             <Alert className="mt-5 border-red-300 bg-red-50 text-red-900" role="alert">
               <AlertTitle>Recipe import failed</AlertTitle>
-              <AlertDescription>{importResult.errorMessage ?? "We couldn’t read a complete recipe from that page."}</AlertDescription>
+              <AlertDescription>{recipeImportFailureMessage(importResult.errorMessage)}</AlertDescription>
             </Alert>
           ) : importResult?.recipeId ? (
             <Card className="mt-5">

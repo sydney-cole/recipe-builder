@@ -31,7 +31,10 @@ describe("RecipeCard", () => {
       "/app/recipe-book/orzo",
     );
     expect(screen.getByText("In Recipe Book")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add to grocery list" })).toBeEnabled();
+    const groceryButton = screen.getByRole("button", { name: "Add to grocery list" });
+    expect(groceryButton).toBeEnabled();
+    expect(groceryButton).toHaveClass("recipe-card-grocery-action");
+    expect(groceryButton).not.toHaveClass("whitespace-nowrap");
   });
 
   it("does not create broken detail links for preview cards", async () => {

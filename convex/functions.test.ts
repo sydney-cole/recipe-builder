@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -93,6 +93,17 @@ describe("daily recipe recommendations", () => {
 });
 
 describe("email functions", () => {
+  const configuredInbox = process.env.AGENTMAIL_INBOX_ID;
+
+  beforeEach(() => {
+    process.env.AGENTMAIL_INBOX_ID = "inbox-1";
+  });
+
+  afterEach(() => {
+    if (configuredInbox === undefined) delete process.env.AGENTMAIL_INBOX_ID;
+    else process.env.AGENTMAIL_INBOX_ID = configuredInbox;
+  });
+
   it("requires authentication and deduplicates normalized URL submissions", async () => {
     const t = initTest();
     await expect(
@@ -159,6 +170,7 @@ describe("email functions", () => {
       thread: {},
       message: {
         inbox_id: "inbox-1",
+        from: "lin@example.com",
         message_id: "message-1",
         subject: "Two links",
         text: "https://example.com/dinner?utm_source=email https://example.com/dinner",
@@ -166,10 +178,17 @@ describe("email functions", () => {
     });
     expect(first).toEqual({ queued: 0 });
 
+    const duplicateEvent = await t.mutation(internal.email.onMessageReceived, {
+      eventId: "event-1",
+      thread: {},
+      message: { inbox_id: "inbox-1", from: "lin@example.com", text: "https://example.com/other" },
+    });
+    expect(duplicateEvent).toEqual({ queued: 0 });
+
     const repeatedUrl = await t.mutation(internal.email.onMessageReceived, {
       eventId: "event-2",
       thread: {},
-      message: { inbox_id: "inbox-1", text: "https://example.com/dinner" },
+      message: { inbox_id: "inbox-1", from: "lin@example.com", text: "https://example.com/dinner" },
     });
     expect(repeatedUrl).toEqual({ queued: 0 });
 
@@ -179,11 +198,97 @@ describe("email functions", () => {
       message: { inbox_id: "unknown", text: "https://example.com/other" },
     });
     expect(unknownInbox).toEqual({ queued: 0 });
+
+    const recentEmails = await t.withIdentity({ subject: userId }).query(
+      api.email.recentInboundEmails,
+    );
+    expect(recentEmails).toHaveLength(2);
+    expect(recentEmails.every((email) => email.status === "processing")).toBe(true);
+    const inboundEmails = await t.run(async (ctx) =>
+      ctx.db.query("inboundRecipeEmails").collect(),
+    );
+    expect(inboundEmails.every((email) => email.primaryImportId !== undefined)).toBe(true);
+  });
+
+  it("marks a legacy email without an explicit recipe import as failed", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "LegacyEmail");
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://example.com/pasta",
+        normalizedUrl: "https://example.com/pasta",
+        sourceKind: "email",
+        sourceEventId: "legacy-event",
+        status: "needs_review",
+        attemptCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("inboundRecipeEmails", {
+        userId,
+        inboxId: "inbox-1",
+        eventId: "legacy-event",
+        receivedAt: now,
+        linkCount: 3,
+        queuedCount: 3,
+      });
+    });
+
+    const [email] = await t.withIdentity({ subject: userId }).query(
+      api.email.recentInboundEmails,
+    );
+    expect(email.status).toBe("failed");
+    expect(email.recipeId).toBeUndefined();
+  });
+
+  it("does not retry a URL by email after the same URL failed in Discover", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "FailedDiscoverUrl");
+    const importId = await t.run(async (ctx) => {
+      const now = Date.now();
+      return await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://example.com/blocked-recipe",
+        normalizedUrl: "https://example.com/blocked-recipe",
+        sourceKind: "direct",
+        status: "failed",
+        attemptCount: 1,
+        workflowId: "failed-workflow",
+        errorMessage: "firecrawl_request_failed",
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+
+    expect(await t.mutation(internal.email.onMessageReceived, {
+      eventId: "failed-forward-event",
+      thread: {},
+      message: {
+        inbox_id: "inbox-1",
+        from: "faileddiscoverurl@example.com",
+        text: "https://example.com/blocked-recipe?utm_source=email",
+      },
+    })).toEqual({ queued: 0 });
+
+    const recipeImport = await t.run(async (ctx) => ctx.db.get(importId));
+    expect(recipeImport).toMatchObject({
+      status: "failed",
+      workflowId: "failed-workflow",
+      attemptCount: 1,
+    });
+    const [email] = await t.withIdentity({ subject: userId }).query(
+      api.email.recentInboundEmails,
+    );
+    expect(email.status).toBe("failed");
+    expect(email.recipeId).toBeUndefined();
   });
 
   it("bounds webhook event identifiers before deduplication", async () => {
+    process.env.AGENTMAIL_INBOX_ID = "bounded-inbox";
     const t = initTest();
-    const userId = await createUser(t, "Bounded Webhook");
+    const userId = await createUser(t, "BoundedWebhook");
     const longEventId = `event-${"x".repeat(600)}`;
     await t.run(async (ctx) => {
       const now = Date.now();
@@ -194,15 +299,13 @@ describe("email functions", () => {
         createdAt: now,
         updatedAt: now,
       });
-      await ctx.db.insert("recipeImports", {
-        requestedBy: userId,
-        sourceUrl: "https://example.com/recipe",
-        normalizedUrl: "https://example.com/recipe",
-        sourceEventId: longEventId.slice(0, 500),
-        status: "queued",
-        attemptCount: 0,
-        createdAt: now,
-        updatedAt: now,
+      await ctx.db.insert("inboundRecipeEmails", {
+        userId,
+        inboxId: "bounded-inbox",
+        eventId: longEventId.slice(0, 500),
+        receivedAt: now,
+        linkCount: 1,
+        queuedCount: 1,
       });
     });
 
@@ -212,6 +315,7 @@ describe("email functions", () => {
         thread: {},
         message: {
           inbox_id: "bounded-inbox",
+          from: "boundedwebhook@example.com",
           text: "https://example.com/another-recipe",
         },
       }),

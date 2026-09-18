@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { BookPlus } from "lucide-react";
+import { BookPlus, ExternalLink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AddRecipeToListButton } from "@/components/grocery/add-recipe-to-list-button";
@@ -13,9 +13,11 @@ import type { Id } from "@/convex/_generated/dataModel";
 export function RecipePreviewActions({
   recipeId,
   isSaved,
+  sourceUrl,
 }: {
   recipeId: Id<"recipes">;
   isSaved: boolean;
+  sourceUrl: string;
 }) {
   const addToBook = useMutation(api.recipeCards.addToBook);
   const router = useRouter();
@@ -36,13 +38,19 @@ export function RecipePreviewActions({
 
   return (
     <div>
-      <div className="cluster">
-        <Button onClick={() => void save()} disabled={isSaving || isSaved}>
+      <div className="recipe-preview-actions grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Button className="h-full min-h-12 w-full" onClick={() => void save()} disabled={isSaving || isSaved}>
           <BookPlus size={17} />
           {isSaved ? "In Recipe Book" : isSaving ? "Adding…" : "Add to Recipe Book"}
         </Button>
-        <CurrentRecipeButton recipeId={recipeId} size="default" variant="secondary" />
-        <AddRecipeToListButton recipeId={recipeId} />
+        <CurrentRecipeButton className="h-full w-full" recipeId={recipeId} size="default" variant="secondary" />
+        <AddRecipeToListButton className="h-full min-h-12 w-full" recipeId={recipeId} />
+        <Button asChild className="h-full min-h-12 w-full" variant="secondary">
+          <a href={sourceUrl} target="_blank" rel="noreferrer">
+            <ExternalLink size={17} />
+            View original
+          </a>
+        </Button>
       </div>
       {error && (
         <p className="mt-3 text-sm font-bold text-red-700" role="alert">

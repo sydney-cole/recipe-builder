@@ -70,6 +70,8 @@ export function isLikelyIndividualRecipePage(value: string, title = "") {
   const decodedPath = decodeURIComponent(pathname);
   const normalizedTitle = title.trim().toLowerCase();
   if (
+    decodedPath === "/" ||
+    /^\/(?:about|contact|privacy|terms|unsubscribe|profile|she|he|they)\/?$/.test(decodedPath) ||
     /\/(?:collections?|categor(?:y|ies)|tags?|search)(?:\/|$)/.test(decodedPath) ||
     /\/(?:recipe-)?roundups?(?:\/|$)/.test(decodedPath) ||
     /\/(?:\d+|our)-[^/]*recipes?[^/]*(?:\/|$)/.test(decodedPath)
@@ -110,6 +112,13 @@ export function recipeLinksFromMessage(message: unknown) {
     }
   });
   return [...new Set(normalized)].slice(0, MAX_LINKS_PER_MESSAGE);
+}
+
+export function primaryRecipeLinkFromMessage(message: unknown) {
+  const link = recipeLinksFromMessage(message).find((candidate) =>
+    isLikelyIndividualRecipePage(candidate),
+  );
+  return link === undefined ? [] : [link];
 }
 
 export function optionalStringField(value: unknown, key: string) {

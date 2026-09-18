@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-18T18:29:01Z
+- **Last updated:** 2026-09-18T19:58:56Z
 
 ## Log
 
@@ -261,3 +261,35 @@ Book selection mode, updates the current recipe, and returns home after a
 selection (`components/grocery/add-recipe-to-list-button.tsx`,
 `components/recipes/current-recipe-panel.tsx`, `components/recipes/recipe-card.tsx`,
 `app/(app)/app/recipe-book/page.tsx`).
+
+Removed the temporary local discovery fixtures while keeping automatic daily
+recommendation refreshes paused behind the existing deployment flag. Discover
+now presents its production recommendations UI, shows an explicit scraping
+spinner during manual search, applies the same scrape-failure messages to pasted
+links, and no longer shows a redundant ready notification after navigation to a
+completed recipe. Recipe detail actions are arranged as an equal two-column
+grid with Save, Current, Grocery, and View original controls, and the Recipe
+Book displays no more than three cards per desktop row
+(`components/discovery/`, `components/recipes/recipe-preview-actions.tsx`,
+`components/recipes/recipe-import-notifications.tsx`,
+`app/(app)/app/recipe-book/page.tsx`).
+
+Reworked email intake around one deployment-configured AgentMail inbox instead
+of provisioning an inbox per user. Forwarded messages are associated with the
+signed-in account by sender, recorded as bounded inbox history, and limited to
+one plausible recipe page so footer and signature links cannot create duplicate
+jobs. Direct and email imports now share individual-recipe URL checks and reuse
+failed URL state, while per-email notifications collapse into one processing or
+failure message. Successful inbox entries open the shared recipe preview with
+Recipe Book, current-recipe, grocery-list, and source actions; failed entries
+show a final download failure without a misleading review or recipe button
+(`convex/email.ts`, `convex/recipeIngestion.ts`, `convex/lib/urls.ts`,
+`convex/schema.ts`, `components/imports/email-intake.tsx`,
+`components/recipes/recipe-preview-modal.tsx`).
+
+Simplified the authenticated shell by moving Recipe Inbox into the main
+navigation, removing the separate Workspace group and top bar, and placing Log
+out directly above Settings in the desktop sidebar. Updated setup and feature
+documentation to match the shared inbox, explicit-save recipe flow, paused
+recommendations option, and current navigation (`components/app-shell/app-shell.tsx`,
+`app/globals.css`, `README.md`).
