@@ -8,11 +8,11 @@
 - **Frontend:** Codex Sites
 - **Convex deployment:** https://striped-meadowlark-868.convex.cloud (development)
 - **Components:** @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/agent, @convex-dev/workflow
-- **Convex features:** schema, tables, indexes, full-text search, queries, realtime queries, mutations, actions, HTTP actions, file storage, registered components
+- **Convex features:** schema, tables, indexes, full-text search, queries, realtime queries, mutations, actions, HTTP actions, scheduled functions, file storage, registered components
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-18T20:07:12Z
+- **Last updated:** 2026-09-20T01:45:04Z
 
 ## Log
 
@@ -298,3 +298,10 @@ recommendations option, and current navigation (`components/app-shell/app-shell.
 Published the repository and launched the public PerfectPlate frontend on
 Codex Sites. The hosted app continues to use Convex as its database and
 application backend (`README.md`, `CHATGPT_SITES.md`).
+
+### 2026-09-20 - 14fdd96
+Refined the landing page and recipe actions, removed unused subscription screens, and added owned-list progress queries plus confirmed account deletion with staged background cleanup. Convex features: queries, mutations, scheduled functions (`271e837`; `convex/groceryLists.ts`, `convex/users.ts`, `components/settings/settings-panel.tsx`).
+Added descriptive route titles, a named collapsed Settings link, focusable skip targets, and one primary heading on authentication pages. Moved marketing navigation outside main content (`app/`, `components/app-shell/app-shell.tsx`, `components/auth/`).
+Corrected eyebrow text and focus contrast on green backgrounds, strengthened placeholders and control borders, made step numbers readable, and adjusted the narrow-screen header and decorative recipe note (`app/globals.css`, `app/(marketing)/page.tsx`).
+Made skeletons decorative and exposed loading text through status regions without permanently marking the announcements busy (`components/ui/skeleton.tsx`, `components/recipes/`, `components/grocery/`, `components/imports/`).
+Initial verification passed typecheck, lint, 169 tests, and HTML-based axe checks on four public routes; computed color-pair checks passed for the corrected text and borders. A subsequent verification passed typecheck and all 169 tests again, plus accessibility source and build-log consistency checks; ESLint completed with no errors and one unused `Check` import warning in `app/(marketing)/page.tsx`. Browser discovery still returned no connected browsers, so final live keyboard and 320px visual rechecks remain pending; authenticated browser flows also remain unverified. No deployment of these changes was verified.
