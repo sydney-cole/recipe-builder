@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -333,22 +333,9 @@ describe("user settings", () => {
     const userId = await createUser(t, "Original");
     const asUser = t.withIdentity({ subject: userId });
     await asUser.mutation(api.users.updateProfile, { name: "  Ada Byron  " });
-    await asUser.mutation(api.users.updateNotificationPreferences, {
-      preferences: {
-        recipeImportReady: false,
-        importNeedsReview: true,
-        subscriptionNeedsAttention: false,
-      },
-    });
-
     expect(await asUser.query(api.users.current)).toMatchObject({
       name: "Ada Byron",
       email: "original@example.com",
-      notificationPreferences: {
-        recipeImportReady: false,
-        importNeedsReview: true,
-        subscriptionNeedsAttention: false,
-      },
     });
   });
 
@@ -358,6 +345,63 @@ describe("user settings", () => {
     await expect(
       t.withIdentity({ subject: userId }).mutation(api.users.updateProfile, { name: "   " }),
     ).rejects.toThrow(/Name is required/);
+  });
+
+  it("deletes account-owned data and disconnects retained recipe imports", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "DeleteMe");
+    const recipeId = await createRecipe(t, "account-recipe", { requestedBy: userId });
+    const records = await t.run(async (ctx) => {
+      const now = Date.now();
+      const savedRecipeId = await ctx.db.insert("savedRecipes", {
+        userId,
+        recipeId,
+        isFavorite: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const groceryListId = await ctx.db.insert("groceryLists", {
+        userId,
+        name: "My groceries",
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const inboxId = await ctx.db.insert("userInboxes", {
+        userId,
+        inboxId: "delete-me-inbox",
+        email: "delete-me@example.com",
+        createdAt: now,
+        updatedAt: now,
+      });
+      const accountId = await ctx.db.insert("authAccounts", {
+        userId,
+        provider: "password",
+        providerAccountId: "delete-me@example.com",
+      });
+      const sessionId = await ctx.db.insert("authSessions", {
+        userId,
+        expirationTime: now + 60_000,
+      });
+      const refreshTokenId = await ctx.db.insert("authRefreshTokens", {
+        sessionId,
+        expirationTime: now + 60_000,
+      });
+      return { savedRecipeId, groceryListId, inboxId, accountId, sessionId, refreshTokenId };
+    });
+
+    vi.useFakeTimers();
+    await t.withIdentity({ subject: userId }).mutation(api.users.deleteAccount, { confirmation: "DELETE" });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    vi.useRealTimers();
+
+    await t.run(async (ctx) => {
+      expect(await ctx.db.get(userId)).toBeNull();
+      for (const id of Object.values(records)) expect(await ctx.db.get(id)).toBeNull();
+      const recipe = await ctx.db.get(recipeId);
+      const recipeImport = recipe?.importId ? await ctx.db.get(recipe.importId) : null;
+      expect(recipeImport?.requestedBy).toBeUndefined();
+    });
   });
 });
 

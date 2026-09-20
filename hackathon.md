@@ -3,16 +3,16 @@
 - **Project:** PerfectPlate
 - **Event:** Convex All Gas Hackathon
 - **What it does:** Helps home cooks discover and import recipes, turn ingredients into a grocery list, and save personal recipe cards with notes.
-- **Live app:** not deployed
-- **Repo:** private
-- **Frontend:** not deployed
+- **Live app:** https://perfectplate.atomic-objec-2513.chatgpt.site/
+- **Repo:** https://github.com/sydney-cole/recipe-builder
+- **Frontend:** Codex Sites
 - **Convex deployment:** https://striped-meadowlark-868.convex.cloud (development)
 - **Components:** @firecrawl/firecrawl-convex, @agentmail/convex, @convex-dev/agent, @convex-dev/workflow
 - **Convex features:** schema, tables, indexes, full-text search, queries, realtime queries, mutations, actions, HTTP actions, file storage, registered components
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-18T19:58:56Z
+- **Last updated:** 2026-09-18T20:07:12Z
 
 ## Log
 
@@ -246,7 +246,7 @@ The optional schema addition was deployed to development, and the full suite
 passes 140 tests (`convex/schema.ts`, `convex/groceryLists.ts`,
 `components/grocery/add-recipe-to-list-button.tsx`, `app/(app)/app/grocery-lists/`).
 
-### 2026-09-18 - working tree
+### 2026-09-18 - adebf38
 Added a reusable Firecrawl Agent request guard with a deployment-configurable
 500-credit default and tests that reject unsafe ceilings. Added a separate
 deployment flag that pauses automatic daily recommendation refreshes while
@@ -293,3 +293,8 @@ out directly above Settings in the desktop sidebar. Updated setup and feature
 documentation to match the shared inbox, explicit-save recipe flow, paused
 recommendations option, and current navigation (`components/app-shell/app-shell.tsx`,
 `app/globals.css`, `README.md`).
+
+### 2026-09-18 - working tree
+Published the repository and launched the public PerfectPlate frontend on
+Codex Sites. The hosted app continues to use Convex as its database and
+application backend (`README.md`, `CHATGPT_SITES.md`).

@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { BookOpen, Compass, Home, Inbox, ListChecks, LogOut, Settings } from "lucide-react";
+import { BookOpen, Compass, Home, Inbox, ListChecks, LogOut, MoreHorizontal, Settings } from "lucide-react";
 import { Brand } from "@/components/brand";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { RecipeImportNotifications } from "@/components/recipes/recipe-import-notifications";
 
@@ -34,6 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   async function handleSignOut() {
     setSignOutError(false);
@@ -75,8 +77,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        {primary.map((item) => <NavItem key={item.href} item={item} mobile />)}
+        {primary.slice(0, 4).map((item) => <NavItem key={item.href} item={item} mobile />)}
+        <button type="button" className="nav-link" aria-label="More navigation" onClick={() => setMobileMenuOpen(true)}>
+          <MoreHorizontal size={20} strokeWidth={1.9} />
+          <span className="nav-label">More</span>
+        </button>
       </nav>
+      <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+        <DialogContent>
+          <DialogTitle>More</DialogTitle>
+          <DialogDescription>Open your Recipe Inbox, account settings, or sign out.</DialogDescription>
+          <nav className="mt-5 grid gap-2" aria-label="More navigation options">
+            <Link className="nav-link" href="/app/imports" onClick={() => setMobileMenuOpen(false)}><Inbox size={20} /><span>Recipe Inbox</span></Link>
+            <Link className="nav-link" href="/app/settings" onClick={() => setMobileMenuOpen(false)}><Settings size={20} /><span>Settings</span></Link>
+            <button type="button" className="nav-link w-full border-0 bg-transparent text-left" disabled={isSigningOut} onClick={() => void handleSignOut()}><LogOut size={20} /><span>{isSigningOut ? "Logging out…" : "Log out"}</span></button>
+            {signOutError && <p className="px-3 text-xs font-bold text-red-700" role="alert">Couldn&apos;t sign out. Try again.</p>}
+          </nav>
+        </DialogContent>
+      </Dialog>
       <RecipeImportNotifications />
     </div>
   );

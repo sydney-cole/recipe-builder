@@ -2,7 +2,6 @@
 
 import { useMutation } from "convex/react";
 import { BookPlus, ExternalLink } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AddRecipeToListButton } from "@/components/grocery/add-recipe-to-list-button";
 import { CurrentRecipeButton } from "@/components/recipes/current-recipe-button";
@@ -20,16 +19,18 @@ export function RecipePreviewActions({
   sourceUrl: string;
 }) {
   const addToBook = useMutation(api.recipeCards.addToBook);
-  const router = useRouter();
   const [isSaving, setIsSaving] = useState(false);
+  const [savedLocally, setSavedLocally] = useState(false);
   const [error, setError] = useState("");
+  const saved = isSaved || savedLocally;
 
   async function save() {
     setIsSaving(true);
     setError("");
     try {
       await addToBook({ recipeId });
-      router.push("/app/recipe-book");
+      setSavedLocally(true);
+      setIsSaving(false);
     } catch {
       setError("We couldn’t add this recipe to your Recipe Book. Try again.");
       setIsSaving(false);
@@ -39,9 +40,9 @@ export function RecipePreviewActions({
   return (
     <div>
       <div className="recipe-preview-actions grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Button className="h-full min-h-12 w-full" onClick={() => void save()} disabled={isSaving || isSaved}>
+        <Button className="h-full min-h-12 w-full" onClick={() => void save()} disabled={isSaving || saved}>
           <BookPlus size={17} />
-          {isSaved ? "In Recipe Book" : isSaving ? "Adding…" : "Add to Recipe Book"}
+          {saved ? "In Recipe Book" : isSaving ? "Adding…" : "Add to Recipe Book"}
         </Button>
         <CurrentRecipeButton className="h-full w-full" recipeId={recipeId} size="default" variant="secondary" />
         <AddRecipeToListButton className="h-full min-h-12 w-full" recipeId={recipeId} />
@@ -57,6 +58,7 @@ export function RecipePreviewActions({
           {error}
         </p>
       )}
+      {savedLocally && <p className="mt-3 text-sm font-bold text-primary" role="status">Added to your Recipe Book.</p>}
     </div>
   );
 }

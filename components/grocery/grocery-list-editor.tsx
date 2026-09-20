@@ -88,7 +88,7 @@ export function GroceryListEditor({
   async function persistList() {
     setSaveState("saving");
     try {
-      await saveList({
+      const savedListId = await saveList({
         listId: listId as Id<"groceryLists"> | undefined,
         requestId,
         name: listName,
@@ -106,7 +106,7 @@ export function GroceryListEditor({
         })),
       });
       setSaveState("saved");
-      router.replace("/app");
+      if (listId === undefined) router.replace(`/app/grocery-lists/${savedListId}`);
     } catch {
       setSaveState("error");
     }

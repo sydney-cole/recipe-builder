@@ -1,28 +1,18 @@
 "use client";
 
+import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
-import { Bell, ShieldCheck, UserRound } from "lucide-react";
+import { ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
-
-type NotificationPreferences = {
-  recipeImportReady: boolean;
-  importNeedsReview: boolean;
-  subscriptionNeedsAttention: boolean;
-};
-
-const defaultPreferences: NotificationPreferences = {
-  recipeImportReady: true,
-  importNeedsReview: true,
-  subscriptionNeedsAttention: true,
-};
 
 export function SettingsPanel() {
   const user = useQuery(api.users.current);
@@ -51,11 +41,13 @@ export function SettingsPanel() {
 
 function SettingsContent({ user }: { user: Doc<"users"> }) {
   const updateProfile = useMutation(api.users.updateProfile);
-  const updateNotificationPreferences = useMutation(api.users.updateNotificationPreferences);
+  const deleteAccount = useMutation(api.users.deleteAccount);
+  const { signOut } = useAuthActions();
+  const router = useRouter();
   const [name, setName] = useState(user.name ?? "");
-  const [preferences, setPreferences] = useState(user.notificationPreferences ?? defaultPreferences);
   const [profileState, setProfileState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [notificationState, setNotificationState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteState, setDeleteState] = useState<"idle" | "deleting" | "error">("idle");
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
@@ -74,25 +66,18 @@ function SettingsContent({ user }: { user: Doc<"users"> }) {
     }
   }
 
-  async function changePreference(key: keyof NotificationPreferences, checked: boolean) {
-    const previous = preferences;
-    const next = { ...preferences, [key]: checked };
-    setPreferences(next);
-    setNotificationState("saving");
+  async function handleDeleteAccount() {
+    if (deleteConfirmation !== "DELETE") return;
+    setDeleteState("deleting");
     try {
-      await updateNotificationPreferences({ preferences: next });
-      setNotificationState("saved");
+      await deleteAccount({ confirmation: deleteConfirmation });
+      await signOut();
+      router.replace("/sign-in");
+      router.refresh();
     } catch {
-      setPreferences(previous);
-      setNotificationState("error");
+      setDeleteState("error");
     }
   }
-
-  const notificationOptions: Array<{ key: keyof NotificationPreferences; label: string }> = [
-    { key: "recipeImportReady", label: "A recipe import is ready" },
-    { key: "importNeedsReview", label: "An import needs review or fails" },
-    { key: "subscriptionNeedsAttention", label: "A subscription needs attention" },
-  ];
 
   return (
     <div className="grid max-w-3xl gap-5">
@@ -126,22 +111,26 @@ function SettingsContent({ user }: { user: Doc<"users"> }) {
       <Card>
         <CardContent>
           <div className="flex gap-3">
-            <Bell className="shrink-0 text-primary" />
-            <div><h2 className="section-heading">Notifications</h2><p className="section-copy">Choose which updates should get your attention.</p></div>
+            <Trash2 className="shrink-0 text-red-700" />
+            <div><h2 className="section-heading">Delete account</h2><p className="section-copy">Permanently delete your account and all of your PerfectPlate data.</p></div>
           </div>
-          <div className="mt-1">
-            {notificationOptions.map(({ key, label }) => (
-              <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 border-t border-border pt-4 text-sm font-bold" key={key}>
-                {label}
-                <Checkbox checked={preferences[key]} disabled={notificationState === "saving"} onCheckedChange={(checked) => void changePreference(key, checked === true)} aria-label={label} />
+          <Dialog onOpenChange={(open) => { if (!open && deleteState !== "deleting") { setDeleteConfirmation(""); setDeleteState("idle"); } }}>
+            <DialogTrigger asChild><Button className="mt-5" variant="destructive">Delete account</Button></DialogTrigger>
+            <DialogContent>
+              <DialogTitle>Delete your account?</DialogTitle>
+              <DialogDescription>This permanently deletes your profile, saved recipes, grocery lists, and recipe inbox data. This action cannot be undone.</DialogDescription>
+              <label className="mt-5 grid gap-2 text-sm font-bold">
+                Type DELETE to confirm
+                <Input autoComplete="off" value={deleteConfirmation} onChange={(event) => { setDeleteConfirmation(event.target.value); setDeleteState("idle"); }} />
               </label>
-            ))}
-          </div>
-          <div className="mt-4 min-h-5 text-xs font-bold" aria-live="polite">
-            {notificationState === "saving" && <p className="text-muted-foreground">Saving preferences…</p>}
-            {notificationState === "saved" && <p className="text-primary">Preferences saved.</p>}
-            {notificationState === "error" && <p className="text-red-700" role="alert">Preferences weren’t saved. Try again.</p>}
-          </div>
+              {deleteState === "error" && <p className="mt-3 text-sm font-bold text-red-700" role="alert">Your account couldn’t be deleted. Try again.</p>}
+              <div className="mt-5 flex justify-end">
+                <Button variant="destructive" disabled={deleteConfirmation !== "DELETE" || deleteState === "deleting"} onClick={() => void handleDeleteAccount()}>
+                  {deleteState === "deleting" ? "Deleting account…" : "Permanently delete account"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
       <p className="flex gap-2 text-xs text-muted-foreground"><ShieldCheck size={16} className="shrink-0" />Your settings are saved securely to your PerfectPlate account.</p>

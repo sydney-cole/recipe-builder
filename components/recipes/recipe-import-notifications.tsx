@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { LoaderCircle, PencilLine, TriangleAlert, X } from "lucide-react";
+import { BookOpen, CheckCircle2, LoaderCircle, PencilLine, TriangleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
@@ -15,7 +15,6 @@ type ImportStartedEvent = CustomEvent<{ importId: string }>;
 
 export function RecipeImportNotifications() {
   const imports = useQuery(api.email.recentImports);
-  const user = useQuery(api.users.current);
   const [trackedIds, setTrackedIds] = useState<string[]>([]);
   const [previewRecipeId, setPreviewRecipeId] = useState<Id<"recipes"> | null>(null);
   const [manualImportId, setManualImportId] = useState<string | null>(null);
@@ -58,7 +57,6 @@ export function RecipeImportNotifications() {
     }
   }, [imports]);
 
-  const preferences = user?.notificationPreferences;
   const trackedCandidates = trackedIds
     .map((id) => imports?.find((item) => item._id === id))
     .filter((item): item is Doc<"recipeImports"> => item !== undefined);
@@ -75,11 +73,12 @@ export function RecipeImportNotifications() {
 
     // One forwarded email is one user-visible job. If any URL from that email
     // produced a recipe, suppress failures from unrelated signature links.
-    if (group.some((item) => item.status === "completed" || item.status === "needs_review")) {
-      return [];
-    }
+    const completed = group.find((item) =>
+      (item.status === "completed" || item.status === "needs_review") && item.recipeId !== undefined,
+    );
+    if (completed) return [{ key, item: completed, ids: group.map((item) => item._id) }];
     const failed = group.find((item) => item.status === "failed");
-    if (failed && (preferences?.importNeedsReview ?? true)) {
+    if (failed) {
       return [{ key, item: failed, ids: group.map((item) => item._id) }];
     }
     return [];
@@ -90,14 +89,16 @@ export function RecipeImportNotifications() {
       <div className="fixed bottom-24 right-4 z-40 grid w-[min(92vw,24rem)] gap-3 md:bottom-6" aria-live="polite" aria-label="Recipe import notifications">
         {trackedImportGroups.map(({ key, item: recipeImport, ids }) => {
           const failed = recipeImport.status === "failed";
+          const completed = recipeImport.status === "completed" || recipeImport.status === "needs_review";
           return (
             <div className="rounded-xl border border-border bg-white p-4 shadow-2xl" key={key} role={failed ? "alert" : "status"}>
               <div className="flex items-start gap-3">
-                {failed ? <TriangleAlert className="mt-0.5 shrink-0 text-red-600" size={20} /> : <LoaderCircle className="mt-0.5 shrink-0 animate-spin text-primary" size={20} />}
+                {failed ? <TriangleAlert className="mt-0.5 shrink-0 text-red-600" size={20} /> : completed ? <CheckCircle2 className="mt-0.5 shrink-0 text-primary" size={20} /> : <LoaderCircle className="mt-0.5 shrink-0 animate-spin text-primary" size={20} />}
                 <div className="min-w-0 flex-1">
-                  <p className="font-extrabold">{failed ? "Recipe import failed" : "Creating your recipe card"}</p>
-                  <p className="mt-1 text-sm leading-5 text-muted-foreground">{failed ? recipeImportFailureMessage(recipeImport.errorMessage) : "We’re processing the source. You can keep using PerfectPlate while it finishes."}</p>
+                  <p className="font-extrabold">{failed ? "Recipe import failed" : completed ? "Your recipe is ready" : "Creating your recipe card"}</p>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">{failed ? recipeImportFailureMessage(recipeImport.errorMessage) : completed ? "Review the recipe card, then save it when it looks right." : "We’re processing the source. You can keep using PerfectPlate while it finishes."}</p>
                   {failed && <Button className="mt-3" size="sm" onClick={() => setManualImportId(recipeImport._id)}><PencilLine size={16} />Add manually</Button>}
+                  {completed && recipeImport.recipeId && <Button className="mt-3" size="sm" onClick={() => { setPreviewRecipeId(recipeImport.recipeId!); setTrackedIds((current) => current.filter((id) => !ids.includes(id as Id<"recipeImports">))); }}><BookOpen size={16} />View recipe</Button>}
                 </div>
                 <button className="grid size-7 shrink-0 place-items-center rounded-md hover:bg-surface-subtle" onClick={() => setTrackedIds((current) => current.filter((id) => !ids.includes(id as Id<"recipeImports">)))} aria-label="Dismiss recipe notification"><X size={16} /></button>
               </div>

@@ -32,7 +32,7 @@ describe("RecipeImportNotifications", () => {
     mocks.addToBook.mockReset().mockResolvedValue(null);
   });
 
-  it("keeps processing visible and removes the notification when the recipe completes", async () => {
+  it("keeps processing visible and offers the recipe when the import completes", async () => {
     mocks.imports = [{ _id: "import-1", status: "processing" }];
     const { rerender } = render(<RecipeImportNotifications />);
     expect(await screen.findByText("Creating your recipe card")).toBeInTheDocument();
@@ -40,7 +40,8 @@ describe("RecipeImportNotifications", () => {
     mocks.imports = [{ _id: "import-1", status: "completed", recipeId: "recipe-1" }];
     rerender(<RecipeImportNotifications />);
     await waitFor(() => expect(screen.queryByText("Creating your recipe card")).not.toBeInTheDocument());
-    expect(screen.queryByText("Your recipe is ready")).not.toBeInTheDocument();
+    expect(screen.getByText("Your recipe is ready")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View recipe" })).toBeEnabled();
   });
 
   it("shows one notification for multiple URLs discovered in the same email", async () => {

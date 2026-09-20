@@ -5,7 +5,18 @@ import { SettingsPanel } from "./settings-panel";
 
 const mocks = vi.hoisted(() => ({
   updateProfile: vi.fn(),
-  updatePreferences: vi.fn(),
+  deleteAccount: vi.fn(),
+  signOut: vi.fn(),
+  replace: vi.fn(),
+  refresh: vi.fn(),
+}));
+
+vi.mock("@convex-dev/auth/react", () => ({
+  useAuthActions: () => ({ signOut: mocks.signOut }),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace, refresh: mocks.refresh }),
 }));
 
 vi.mock("@/convex/_generated/api", () => ({
@@ -13,7 +24,7 @@ vi.mock("@/convex/_generated/api", () => ({
     users: {
       current: "currentUser",
       updateProfile: "updateProfile",
-      updateNotificationPreferences: "updateNotificationPreferences",
+      deleteAccount: "deleteAccount",
     },
   },
 }));
@@ -22,13 +33,16 @@ vi.mock("convex/react", () => ({
   useQuery: () => ({ _id: "user-1", name: "Ada Lovelace", email: "ada@example.com" }),
   useMutation: (reference: string) => reference === "updateProfile"
     ? mocks.updateProfile
-    : mocks.updatePreferences,
+    : mocks.deleteAccount,
 }));
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
     mocks.updateProfile.mockReset().mockResolvedValue(null);
-    mocks.updatePreferences.mockReset().mockResolvedValue(null);
+    mocks.deleteAccount.mockReset().mockResolvedValue(null);
+    mocks.signOut.mockReset().mockResolvedValue(undefined);
+    mocks.replace.mockReset();
+    mocks.refresh.mockReset();
   });
 
   it("loads the signed-in profile and saves a normalized name", async () => {
@@ -45,19 +59,20 @@ describe("SettingsPanel", () => {
     expect(await screen.findByText("Profile saved.")).toBeInTheDocument();
   });
 
-  it("persists notification choices", async () => {
+  it("removes notifications and requires confirmation before deleting the account", async () => {
     const interaction = userEvent.setup();
     render(<SettingsPanel />);
 
-    await interaction.click(screen.getByRole("checkbox", { name: "A recipe import is ready" }));
+    expect(screen.queryByText("Notifications")).not.toBeInTheDocument();
+    await interaction.click(screen.getByRole("button", { name: "Delete account" }));
 
-    expect(mocks.updatePreferences).toHaveBeenCalledWith({
-      preferences: {
-        recipeImportReady: false,
-        importNeedsReview: true,
-        subscriptionNeedsAttention: true,
-      },
-    });
-    expect(await screen.findByText("Preferences saved.")).toBeInTheDocument();
+    const confirmButton = screen.getByRole("button", { name: "Permanently delete account" });
+    expect(confirmButton).toBeDisabled();
+    await interaction.type(screen.getByLabelText("Type DELETE to confirm"), "DELETE");
+    await interaction.click(confirmButton);
+
+    expect(mocks.deleteAccount).toHaveBeenCalledWith({ confirmation: "DELETE" });
+    expect(mocks.signOut).toHaveBeenCalledOnce();
+    expect(mocks.replace).toHaveBeenCalledWith("/sign-in");
   });
 });

@@ -40,7 +40,15 @@ const quickActions = [
   },
 ];
 
+function timeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function DashboardPage() {
+  const user = useQuery(api.users.current);
   const convexRecipes = useQuery(api.recipes.listRecent);
   const savedRecipeIds = useQuery(api.recipes.savedIds);
   const savedIdSet = savedRecipeIds === undefined ? undefined : new Set(savedRecipeIds);
@@ -63,7 +71,7 @@ export default function DashboardPage() {
   return (
     <div className="page-container">
       <PageHeader
-        eyebrow="Good afternoon"
+        eyebrow={`${timeGreeting()}${user?.name ? `, ${user.name.split(/\s+/)[0]}` : ""}`}
         title="What are we cooking?"
         description="Your kitchen command center for saved recipes and grocery planning."
       />
@@ -109,12 +117,15 @@ export default function DashboardPage() {
           </div>
         ) : recipes.length === 0 ? (
           <Card>
-            <CardContent className="p-8 text-center">
+            <CardContent className="p-8 text-center sm:p-10">
               <BookOpen className="mx-auto text-muted-foreground" />
-              <p className="mt-3 font-extrabold">No recent recipes yet</p>
-              <Button asChild className="mt-4" size="sm">
-                <Link href="/app/discover">Import a recipe</Link>
-              </Button>
+              <p className="mt-3 text-lg font-extrabold">Bring in your first recipe</p>
+              <p className="mx-auto mt-1 max-w-lg text-sm leading-6 text-muted-foreground">Search for something new, paste a link you already love, or forward a recipe from your inbox.</p>
+              <div className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-3">
+                <Button asChild size="sm"><Link href="/app/discover"><Search size={16} />Find recipes</Link></Button>
+                <Button asChild size="sm" variant="secondary"><Link href="/app/discover#paste-recipe">Import a link</Link></Button>
+                <Button asChild size="sm" variant="secondary"><Link href="/app/imports"><Inbox size={16} />Recipe Inbox</Link></Button>
+              </div>
             </CardContent>
           </Card>
         ) : (
@@ -124,7 +135,7 @@ export default function DashboardPage() {
                 key={recipe.id}
                 recipe={recipe}
                 suggested={!recipe.isSaved}
-                canCreateGroceryList={recipe.isSaved}
+                canCreateGroceryList
               />
             ))}
           </div>

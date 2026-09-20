@@ -2,8 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import GroceryListsPage from "./page";
 
+vi.mock("@/convex/_generated/api", () => ({ api: { groceryLists: { listMine: "listMine", itemProgress: "itemProgress" } } }));
+
 vi.mock("convex/react", () => ({
-  useQuery: () => [
+  useQuery: (query: string) => query === "itemProgress" ? { total: 7, checked: 2 } : [
     {
       _id: "list-123",
       name: "Weekend trip",
@@ -34,6 +36,7 @@ describe("GroceryListsPage", () => {
       "href",
       "/app/grocery-lists/list-123",
     );
+    expect(screen.getByText(/5 of 7 left/)).toBeInTheDocument();
   });
 
   it("uses equal-height cards and truncates list titles", () => {

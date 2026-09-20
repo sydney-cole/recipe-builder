@@ -57,4 +57,15 @@ describe("AppShell", () => {
     expect(screen.getByRole("button", { name: "Log out" })).toBeEnabled();
     expect(mocks.replace).not.toHaveBeenCalled();
   });
+
+  it("exposes the inbox, settings, and sign out from mobile navigation", async () => {
+    const user = userEvent.setup();
+    render(<AppShell><p>Kitchen content</p></AppShell>);
+
+    await user.click(screen.getByRole("button", { name: "More navigation" }));
+    expect(screen.getByRole("link", { name: "Recipe Inbox" })).toHaveAttribute("href", "/app/imports");
+    expect(screen.getAllByRole("link", { name: "Settings" }).at(-1)).toHaveAttribute("href", "/app/settings");
+    await user.click(screen.getAllByRole("button", { name: "Log out" }).at(-1)!);
+    expect(mocks.signOut).toHaveBeenCalledOnce();
+  });
 });

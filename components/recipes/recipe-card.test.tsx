@@ -39,10 +39,13 @@ describe("RecipeCard", () => {
 
   it("does not create broken detail links for preview cards", async () => {
     const user = userEvent.setup();
-    render(<RecipeCard recipe={recipe} suggested detailsHref={null} />);
+    render(<RecipeCard recipe={recipe} suggested detailsHref={null} canCreateGroceryList />);
     expect(screen.queryByRole("link", { name: /View Green Orzo/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to grocery list" })).toBeEnabled();
 
     const save = screen.getByRole("button", { name: "Add to Recipe Book" });
+    expect(save).toHaveClass("recipe-card-book-action");
+    expect(save.closest(".recipe-meta")).not.toBeNull();
     await user.click(save);
     expect(screen.getByText("In Recipe Book")).toBeInTheDocument();
     expect(mocks.addToBook).toHaveBeenCalledWith({ recipeId: "orzo" });

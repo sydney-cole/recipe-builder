@@ -20,15 +20,6 @@ export type RecipeImport = {
   detail: string;
 };
 
-export type Subscription = {
-  id: string;
-  name: string;
-  domain: string;
-  status: "active" | "pending" | "paused" | "attention";
-  lastReceived: string;
-  recipeCount: number;
-};
-
 export type GroceryItem = {
   id: string;
   name: string;

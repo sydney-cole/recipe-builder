@@ -312,6 +312,24 @@ export const listMine = query({
   },
 });
 
+export const itemProgress = query({
+  args: { listId: v.id("groceryLists") },
+  returns: v.union(v.null(), v.object({ total: v.number(), checked: v.number() })),
+  handler: async (ctx, { listId }) => {
+    const userId = await requireQueryUser(ctx);
+    const list = await ctx.db.get(listId);
+    if (list === null || list.userId !== userId) return null;
+    const items = await ctx.db
+      .query("groceryListItems")
+      .withIndex("by_list", (q) => q.eq("listId", listId))
+      .take(500);
+    return {
+      total: items.length,
+      checked: items.filter((item) => item.isChecked).length,
+    };
+  },
+});
+
 export const get = query({
   args: { listId: v.id("groceryLists") },
   returns: v.union(

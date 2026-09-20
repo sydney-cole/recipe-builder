@@ -1,15 +1,15 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RecipePreviewActions } from "./recipe-preview-actions";
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), push: vi.fn() }));
+const mocks = vi.hoisted(() => ({ save: vi.fn() }));
 
 vi.mock("convex/react", () => ({
   useMutation: () => mocks.save,
   useQuery: () => null,
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 describe("RecipePreviewActions", () => {
   beforeEach(() => {
@@ -17,7 +17,7 @@ describe("RecipePreviewActions", () => {
     mocks.save.mockResolvedValue(null);
   });
 
-  it("saves the preview and opens the Recipe Book", async () => {
+  it("saves the preview without taking the user away from its actions", async () => {
     const user = userEvent.setup();
     const { container } = render(
       <RecipePreviewActions
@@ -45,6 +45,7 @@ describe("RecipePreviewActions", () => {
     await user.click(screen.getByRole("button", { name: "Add to Recipe Book" }));
 
     expect(mocks.save).toHaveBeenCalledWith({ recipeId: "recipe-1" });
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/app/recipe-book"));
+    expect(await screen.findByRole("button", { name: "In Recipe Book" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Added to your Recipe Book");
   });
 });

@@ -45,7 +45,7 @@ export function RecipeLinkImport() {
   }
 
   return (
-    <Card className="discovery-import-card">
+    <Card className="discovery-import-card" id="paste-recipe">
       <CardContent className="discovery-import-content">
         <div className="cluster">
           <Link2 className="text-primary" size={20} />

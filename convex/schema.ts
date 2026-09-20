@@ -34,6 +34,20 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     avatarUrl: v.optional(v.string()),
     currentRecipeId: v.optional(v.id("recipes")),
+    deletionRequestedAt: v.optional(v.number()),
+    deletionStage: v.optional(
+      v.union(
+        v.literal("authAccounts"),
+        v.literal("authSessions"),
+        v.literal("savedRecipes"),
+        v.literal("userInboxes"),
+        v.literal("inboundEmails"),
+        v.literal("recipeImports"),
+        v.literal("groceryLists"),
+      ),
+    ),
+    // Kept temporarily so existing profiles written by the retired settings
+    // UI remain schema-compatible until their next migration.
     notificationPreferences: v.optional(
       v.object({
         recipeImportReady: v.boolean(),
