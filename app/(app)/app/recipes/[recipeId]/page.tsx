@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { convexAuthNextjsToken } from "@convex-dev/auth/nextjs/server";
 import { fetchQuery } from "convex/nextjs";
 import { ArrowLeft, Clock3, Users } from "lucide-react";
@@ -10,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { recipeArt } from "@/lib/data/recipe-view";
+
+export const metadata: Metadata = { title: "Recipe preview" };
 
 export default async function RecipePreviewPage({
   params,

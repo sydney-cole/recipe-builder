@@ -97,7 +97,7 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
   const [message, setMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  if (data === undefined) return <div className="page-container" aria-label="Loading recipe"><Skeleton className="h-10 w-48" /><Skeleton className="mt-6 h-96" /></div>;
+  if (data === undefined) return <div className="page-container" role="status" aria-live="polite"><span className="sr-only">Loading recipe…</span><Skeleton className="h-10 w-48" /><Skeleton className="mt-6 h-96" /></div>;
   if (data === null) return <div className="page-container"><EmptyState icon={Pencil} title="Recipe not found" description="It may have been removed or belong to another account." action={<Button asChild><Link href="/app/recipe-book">Back to Recipe Book</Link></Button>} /></div>;
 
   const { recipe, ingredients, importReview } = data;

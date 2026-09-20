@@ -50,7 +50,7 @@ export function EmailIntake() {
           <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">Forward an email containing a recipe link to the address below. Use the email address associated with your PerfectPlate account so the import appears in your history.</p>
 
           {inbox === undefined ? (
-            <Skeleton className="mt-6 h-16" />
+            <div className="mt-6" role="status" aria-live="polite"><span className="sr-only">Loading recipe inbox address…</span><Skeleton className="h-16" /></div>
           ) : inbox === null ? (
             <Alert className="mt-6 border-red-200 bg-red-50" role="alert">
               <AlertTitle>Inbox unavailable</AlertTitle>
@@ -92,7 +92,7 @@ export function EmailIntake() {
           )}
 
           {recentEmails === undefined ? (
-            <div className="mt-6 grid gap-3"><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
+            <div className="mt-6 grid gap-3" role="status" aria-live="polite"><span className="sr-only">Loading forwarded emails…</span><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
           ) : recentEmails.length === 0 ? (
             <div className="mt-6 rounded-xl border border-dashed border-border p-8 text-center">
               <Inbox className="mx-auto text-muted-foreground" size={28} />

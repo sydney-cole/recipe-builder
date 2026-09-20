@@ -13,7 +13,7 @@ export function SavedGroceryList({ listId }: { listId: string }) {
   });
 
   if (data === undefined) {
-    return <Skeleton className="h-96" aria-label="Loading grocery list" />;
+    return <div role="status" aria-live="polite"><span className="sr-only">Loading grocery list…</span><Skeleton className="h-96" /></div>;
   }
   if (data === null) {
     return (

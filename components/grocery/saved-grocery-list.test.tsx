@@ -36,7 +36,7 @@ describe("SavedGroceryList", () => {
 
   it("shows loading and not-found states", () => {
     const { rerender } = render(<SavedGroceryList listId="list-1" />);
-    expect(screen.getByLabelText("Loading grocery list")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading grocery list…");
 
     mocks.queryResult = null;
     rerender(<SavedGroceryList listId="list-1" />);

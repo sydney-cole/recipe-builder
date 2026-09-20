@@ -100,7 +100,8 @@ export default function RecipeBookPage() {
         </label>
       </div>
       {recipes === undefined ? (
-        <div className="recipe-book-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Loading recipes">
+        <div className="recipe-book-grid grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" role="status" aria-live="polite">
+          <span className="sr-only">Loading recipes…</span>
           {[0, 1, 2].map((item) => <Skeleton className="h-96" key={item} />)}
         </div>
       ) : recipes.length === 0 ? (

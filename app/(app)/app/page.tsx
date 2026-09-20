@@ -110,7 +110,8 @@ export default function DashboardPage() {
           </Button>
         </div>
         {recipes === undefined ? (
-          <div className="grid-auto" aria-label="Loading recent recipes">
+          <div className="grid-auto" role="status" aria-live="polite">
+            <span className="sr-only">Loading recent recipes…</span>
             {[0, 1, 2].map((item) => (
               <Skeleton className="h-96" key={item} />
             ))}

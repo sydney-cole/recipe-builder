@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { GroceryListActions } from "@/components/grocery/grocery-list-actions";
 import { SavedGroceryList } from "@/components/grocery/saved-grocery-list";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = { title: "Grocery list" };
 
 export default async function GroceryListPage({
   params,

@@ -28,7 +28,7 @@ export function CurrentRecipePanel() {
     }
   }
 
-  if (recipe === undefined) return <Skeleton className="mt-8 h-40" />;
+  if (recipe === undefined) return <div role="status" aria-live="polite"><span className="sr-only">Loading current recipe…</span><Skeleton className="mt-8 h-40" /></div>;
 
   return (
     <section className="mt-8" aria-labelledby="current-recipe-title">

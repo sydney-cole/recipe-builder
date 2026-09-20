@@ -118,14 +118,14 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
   }
 
   return (
-    <main id="main-content" className="auth-layout">
+    <main id="main-content" tabIndex={-1} className="auth-layout">
       <section className="auth-story">
         <Brand />
         <div>
-          <p className="eyebrow text-white/70">Your recipes, ready when you are</p>
-          <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
+          <p className="eyebrow eyebrow-on-primary">Your recipes, ready when you are</p>
+          <p className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
             Turn recipe clutter into a calm plan for dinner.
-          </h1>
+          </p>
           <ul className="mt-8 grid gap-4 text-sm text-white/80">
             {["Email recipe links straight to your book", "Find ideas from ingredients and cravings", "Build one tidy, editable grocery list"].map((item) => (
               <li className="flex gap-3" key={item}>
@@ -134,16 +134,16 @@ export function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
             ))}
           </ul>
         </div>
-        <p className="text-xs text-white/60">Secure account access powered by Convex Auth.</p>
+        <p className="text-xs text-white">Secure account access powered by Convex Auth.</p>
       </section>
 
       <section className="auth-panel">
         <div className="w-full max-w-md">
           <div className="mb-10 lg:hidden"><Brand /></div>
           <p className="eyebrow">Welcome {isSignUp ? "to PerfectPlate" : "back"}</p>
-          <h2 className="font-display text-4xl font-semibold">
+          <h1 className="font-display text-4xl font-semibold">
             {isSignUp ? "Create your account" : "Sign in to your kitchen"}
-          </h2>
+          </h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             {isSignUp ? "Save inspiration, simplify shopping, and keep dinner moving." : "Pick up where you left off."}
           </p>

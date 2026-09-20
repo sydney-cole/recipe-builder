@@ -68,12 +68,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="nav-label">{isSigningOut ? "Logging out…" : "Log out"}</span>
           </button>
           {signOutError && <p className="px-3 text-xs font-bold text-red-700" role="alert">Couldn&apos;t sign out. Try again.</p>}
-          <Link className="nav-link" href="/app/settings"><Settings size={20} /><span className="nav-label">Settings</span></Link>
+          <Link className="nav-link" href="/app/settings" aria-label="Settings"><Settings size={20} /><span className="nav-label">Settings</span></Link>
         </div>
       </aside>
 
       <div className="app-frame">
-        <main id="main-content" className="app-main">{children}</main>
+        <main id="main-content" tabIndex={-1} className="app-main">{children}</main>
       </div>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">

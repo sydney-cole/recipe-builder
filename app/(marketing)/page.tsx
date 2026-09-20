@@ -59,7 +59,7 @@ const productFeatures = [
 
 export default function LandingPage() {
   return (
-    <main id="main-content">
+    <>
       <header className="marketing-nav">
         <Brand />
         <nav className="hidden items-center gap-7 text-sm font-bold md:flex" aria-label="Landing page">
@@ -67,11 +67,12 @@ export default function LandingPage() {
           <a href="#features">Features</a>
         </nav>
         <div className="cluster ml-auto">
-          <Button asChild variant="ghost" className="hidden sm:inline-flex"><Link href="/sign-in">Sign in</Link></Button>
+          <Button asChild variant="ghost" className="marketing-sign-in"><Link href="/sign-in">Sign in</Link></Button>
           <Button asChild><Link href="/sign-up">Get started<ArrowRight size={17} /></Link></Button>
         </div>
       </header>
 
+      <main id="main-content" tabIndex={-1}>
       <section className="hero-section">
         <div>
           <p className="eyebrow">A calmer way to decide what’s for dinner</p>
@@ -85,7 +86,6 @@ export default function LandingPage() {
             <Button asChild size="lg"><Link href="/sign-up">Build your Recipe Book<ArrowRight size={18} /></Link></Button>
             <Button asChild size="lg" variant="secondary"><a href="#how-it-works">See how it works</a></Button>
           </div>
-          <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground"><Check size={14} className="text-primary" />Free to get started. Bring your first recipe in minutes.</p>
         </div>
 
         <div className="hero-board" aria-label="A recipe moving from the web into PerfectPlate">
@@ -117,7 +117,7 @@ export default function LandingPage() {
               <CardContent className="p-6">
                 <span className="mb-10 flex items-center justify-between">
                   <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Icon size={21} /></span>
-                  <span className="font-display text-3xl text-border">0{index + 1}</span>
+                  <span className="font-display text-3xl text-muted-foreground">0{index + 1}</span>
                 </span>
                 <h3 className="text-lg font-extrabold">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
@@ -149,13 +149,14 @@ export default function LandingPage() {
       </section>
 
       <section className="landing-cta">
-        <p className="eyebrow text-white/70">Dinner starts with one good recipe</p>
+        <p className="eyebrow eyebrow-on-primary">Dinner starts with one good recipe</p>
         <h2 className="font-display text-4xl font-semibold sm:text-5xl">Bring yours to PerfectPlate.</h2>
-        <p className="mt-4 max-w-2xl text-white/75">Search for something new, paste a favorite link, or forward the recipe waiting in your inbox.</p>
+        <p className="mt-4 max-w-2xl text-white">Search for something new, paste a favorite link, or forward the recipe waiting in your inbox.</p>
         <Button asChild variant="secondary" size="lg" className="mt-7"><Link href="/sign-up">Get started<ArrowRight size={18} /></Link></Button>
       </section>
 
+      </main>
       <footer className="marketing-footer"><Brand /><p>Recipes, organized for real life. · 2026</p></footer>
-    </main>
+    </>
   );
 }

@@ -76,7 +76,7 @@ describe("RecipeBookPage", () => {
   it("renders loading and empty states", () => {
     queryState.value = undefined;
     const { rerender } = render(<RecipeBookPage />);
-    expect(screen.getByLabelText("Loading recipes")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading recipes…");
 
     queryState.value = [];
     rerender(<RecipeBookPage />);

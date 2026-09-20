@@ -56,7 +56,7 @@ export default function GroceryListsPage() {
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {lists === undefined ? (
-          <Skeleton className="h-56" aria-label="Loading grocery lists" />
+          <div role="status" aria-live="polite"><span className="sr-only">Loading grocery lists…</span><Skeleton className="h-56" /></div>
         ) : (
           lists.map((list) => <GroceryListCard key={list._id} list={list} />)
         )}

@@ -71,9 +71,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .input.discovery-search-input { padding-left: 2.75rem; }
 .input.search-input-with-icon { padding-left: 2.75rem; }
 .input.auth-input-with-icon { padding-left: 3rem; padding-right: 3.25rem; }
-.input::placeholder { color: #8a9388; }
+.input::placeholder { color: var(--muted-foreground); opacity: 1; }
+.input, select { border-color: #7c8778; }
 .input:focus { border-color: var(--focus); outline: none; box-shadow: 0 0 0 3px rgb(37 99 235 / .18); }
-.checkbox { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border: 1.5px solid #a8b2a5; border-radius: 6px; background: white; color: white; }
+.checkbox { display: grid; width: 24px; height: 24px; flex: none; place-items: center; border: 1.5px solid #7c8778; border-radius: 6px; background: white; color: white; }
 .checkbox[data-state="checked"] { border-color: var(--primary); background: var(--primary); }
 
 .card { overflow: hidden; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); box-shadow: 0 1px 2px rgb(28 35 27 / .05), 0 8px 24px rgb(28 35 27 / .05); }
@@ -98,6 +99,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .page-container { width: 100%; max-width: 1440px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 .page-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
 .eyebrow { margin-bottom: .35rem; color: var(--primary); font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.eyebrow.eyebrow-on-primary { color: white; }
 .page-title { margin: 0; font-size: clamp(1.75rem, 3vw, 2rem); font-weight: 800; line-height: 1.2; letter-spacing: -.035em; }
 .page-description { max-width: 680px; margin: .45rem 0 0; color: var(--muted-foreground); line-height: 1.55; }
 .mobile-nav { position: fixed; inset: auto 0 0; z-index: 45; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); background: rgb(255 255 255 / .96); padding: .4rem max(.3rem, env(safe-area-inset-right)) max(.4rem, env(safe-area-inset-bottom)) max(.3rem, env(safe-area-inset-left)); backdrop-filter: blur(16px); }
@@ -162,6 +164,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .landing-feature-item { display: flex; align-items: flex-start; gap: 1rem; border: 1px solid var(--border); border-radius: .85rem; background: var(--surface-subtle); padding: 1.15rem; }
 .landing-pill { display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; background: var(--primary-soft); padding: .45rem .7rem; }
 .landing-cta { margin-top: 2rem; background: var(--primary); color: white; padding: 5rem max(1rem, calc((100% - 1136px) / 2)); }
+.landing-cta :focus-visible { outline-color: white; }
 .marketing-footer { display: flex; width: min(100% - 2rem, 1200px); margin: 0 auto; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 2rem 0; color: var(--muted-foreground); font-size: .75rem; }
 
 .auth-layout { display: grid; min-height: 100vh; }
@@ -186,6 +189,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .recipe-detail-hero .food-art { min-height: 320px; }
 
 @media (max-width: 520px) {
+  .marketing-nav { flex-wrap: wrap; gap: .5rem; padding-block: .75rem; }
+  .marketing-nav .app-brand { padding: 0; gap: .4rem; font-size: 1rem; }
+  .marketing-nav .button { white-space: nowrap; padding-inline: .65rem; }
+  .hero-note { right: 0; }
   .grocery-row { grid-template-columns: auto minmax(0, 1fr) auto; }
   .grocery-row > .checkbox { grid-column: 1; grid-row: 1; }
   .grocery-row .ingredient-name { grid-column: 2; grid-row: 1; }
@@ -193,6 +200,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .grocery-row .quantity-input { grid-column: 2; grid-row: 2; width: 70px; }
   .grocery-row .unit-input { grid-column: 2; grid-row: 2; margin-left: 78px; width: 82px; }
   .grocery-row .item-source { grid-column: 2 / -1; grid-row: 3; }
+}
+
+.button.marketing-sign-in { display: none; }
+@media (min-width: 640px) {
+  .button.marketing-sign-in { display: inline-flex; }
 }
 
 @media (min-width: 768px) {

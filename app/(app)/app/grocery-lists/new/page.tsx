@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { GroceryListEditor } from "@/components/grocery/grocery-list-editor";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = { title: "New grocery list" };
 
 export default function NewGroceryListPage() {
   return (

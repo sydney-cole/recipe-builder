@@ -97,14 +97,14 @@ export function PasswordResetForm() {
   }
 
   return (
-    <main id="main-content" className="auth-layout">
+    <main id="main-content" tabIndex={-1} className="auth-layout">
       <section className="auth-story">
         <Brand />
         <div>
-          <p className="eyebrow text-white/70">Account recovery</p>
-          <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
+          <p className="eyebrow eyebrow-on-primary">Account recovery</p>
+          <p className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
             Get back to your recipes and dinner plans.
-          </h1>
+          </p>
           <ul className="mt-8 grid gap-4 text-sm text-white/80">
             <li className="flex gap-3">
               <CheckCircle2 className="mt-px shrink-0" size={19} />
@@ -116,16 +116,16 @@ export function PasswordResetForm() {
             </li>
           </ul>
         </div>
-        <p className="text-xs text-white/60">Secure account access powered by Convex Auth.</p>
+        <p className="text-xs text-white">Secure account access powered by Convex Auth.</p>
       </section>
 
       <section className="auth-panel">
         <div className="w-full max-w-md">
           <div className="mb-10 lg:hidden"><Brand /></div>
           <p className="eyebrow">Reset your password</p>
-          <h2 className="font-display text-4xl font-semibold">
+          <h1 className="font-display text-4xl font-semibold">
             {step === "request" ? "Find your account" : "Check your email"}
-          </h2>
+          </h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             {step === "request"
               ? "Enter the email address you use for PerfectPlate."

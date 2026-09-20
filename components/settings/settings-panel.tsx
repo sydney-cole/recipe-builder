@@ -19,7 +19,8 @@ export function SettingsPanel() {
 
   if (user === undefined) {
     return (
-      <div className="grid max-w-3xl gap-5" aria-label="Loading settings">
+      <div className="grid max-w-3xl gap-5" role="status" aria-live="polite">
+        <span className="sr-only">Loading settings…</span>
         <Skeleton className="h-64" />
         <Skeleton className="h-40" />
         <Skeleton className="h-64" />
