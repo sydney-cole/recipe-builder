@@ -17,11 +17,13 @@ export function GroceryListEditor({
   initialItems = defaultItems,
   initialName = "Untitled grocery list",
   listId,
+  needsInitialSave = listId === undefined,
   canSave = true,
 }: {
   initialItems?: GroceryItem[];
   initialName?: string;
   listId?: string;
+  needsInitialSave?: boolean;
   canSave?: boolean;
 }) {
   const saveList = useMutation(api.groceryLists.save);
@@ -231,7 +233,7 @@ export function GroceryListEditor({
                 <Save size={17} />
                 {saveState === "saving"
                   ? "Saving…"
-                  : listId === undefined
+                  : needsInitialSave
                     ? "Save list"
                     : "Update list"}
               </Button>

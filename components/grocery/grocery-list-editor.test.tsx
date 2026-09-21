@@ -93,6 +93,26 @@ describe("GroceryListEditor", () => {
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
+  it("labels a recipe-created draft as a first save", async () => {
+    const user = userEvent.setup();
+    mocks.save.mockResolvedValueOnce("list-123");
+    render(
+      <GroceryListEditor
+        listId="list-123"
+        needsInitialSave
+        initialName="Lemon spaghetti"
+        initialItems={[]}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Update list" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save list" }));
+
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({ listId: "list-123", name: "Lemon spaghetti" }),
+    );
+  });
+
   it("adds, edits, checks, removes, and restores an item", async () => {
     const user = userEvent.setup();
     render(<GroceryListEditor />);

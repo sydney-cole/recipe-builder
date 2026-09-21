@@ -31,6 +31,7 @@ const groceryListValidator = v.object({
   _creationTime: v.number(),
   userId: v.id("users"),
   clientRequestId: v.optional(v.string()),
+  needsInitialSave: v.optional(v.boolean()),
   name: v.string(),
   sourceRecipeId: v.optional(v.id("recipes")),
   sourceRecipeTitle: v.optional(v.string()),
@@ -398,6 +399,33 @@ export const get = query({
   },
 });
 
+export const summary = query({
+  args: { listId: v.id("groceryLists") },
+  returns: v.union(v.null(), v.object({ isComplete: v.boolean() })),
+  handler: async (ctx, { listId }) => {
+    const userId = await requireQueryUser(ctx);
+    const list = await ctx.db.get(listId);
+    if (list === null || list.userId !== userId) return null;
+
+    const [firstItem, firstRemainingItem] = await Promise.all([
+      ctx.db
+        .query("groceryListItems")
+        .withIndex("by_list", (q) => q.eq("listId", listId))
+        .first(),
+      ctx.db
+        .query("groceryListItems")
+        .withIndex("by_list_and_checked", (q) =>
+          q.eq("listId", listId).eq("isChecked", false),
+        )
+        .first(),
+    ]);
+
+    return {
+      isComplete: firstItem !== null && firstRemainingItem === null,
+    };
+  },
+});
+
 export const create = mutation({
   args: { name: v.string() },
   returns: v.id("groceryLists"),
@@ -462,6 +490,7 @@ export const createFromRecipe = mutation({
     const now = Date.now();
     const listId = await ctx.db.insert("groceryLists", {
       userId,
+      needsInitialSave: true,
       name: recipe.title,
       sourceRecipeId: recipeId,
       sourceRecipeTitle: recipe.title,
@@ -745,7 +774,7 @@ export const save = mutation({
       await ctx.db.delete(existingItem._id);
     }
 
-    await ctx.db.patch(listId, { name, updatedAt: now });
+    await ctx.db.patch(listId, { name, needsInitialSave: false, updatedAt: now });
     return listId;
   },
 });

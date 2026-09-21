@@ -15,7 +15,7 @@ import {
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 
-export function GroceryListActions({ listId }: { listId: string }) {
+export function GroceryListActions({ listId, listName }: { listId: string; listName?: string }) {
   const lists = useQuery(api.groceryLists.listMine);
   const combineLists = useMutation(api.groceryLists.combineLists);
   const removeList = useMutation(api.groceryLists.removeList);
@@ -81,7 +81,7 @@ export function GroceryListActions({ listId }: { listId: string }) {
         <Button
           variant="ghost"
           size="icon"
-          aria-label="More list options"
+          aria-label={listName ? `More options for ${listName}` : "More list options"}
           aria-expanded={menuOpen}
           aria-haspopup="menu"
           onClick={() => setMenuOpen((open) => !open)}

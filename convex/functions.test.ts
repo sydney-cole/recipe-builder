@@ -645,12 +645,39 @@ describe("discovery recipe previews", () => {
     const listId = await asUser.mutation(api.groceryLists.createFromRecipe, {
       recipeId,
     });
+    expect(await asUser.query(api.groceryLists.summary, { listId })).toEqual({
+      isComplete: false,
+    });
     expect(await asUser.query(api.groceryLists.get, { listId })).toMatchObject({
-      list: { name: "Lemon chicken" },
+      list: { name: "Lemon chicken", needsInitialSave: true },
       items: [
         { name: "chicken thighs" },
         { name: "lemon" },
       ],
+    });
+
+    const draft = await asUser.query(api.groceryLists.get, { listId });
+    expect(draft).not.toBeNull();
+    await asUser.mutation(api.groceryLists.save, {
+      listId,
+      requestId: "save-lemon-chicken-list",
+      name: "Lemon chicken",
+      items: draft!.items.map((item, index) => ({
+        itemId: item._id,
+        name: item.name,
+        quantityText: item.quantityText ?? null,
+        unit: item.unit ?? null,
+        category: item.category ?? null,
+        notes: item.notes ?? null,
+        isChecked: true,
+        sortOrder: index + 1,
+      })),
+    });
+    expect(await asUser.query(api.groceryLists.get, { listId })).toMatchObject({
+      list: { needsInitialSave: false },
+    });
+    expect(await asUser.query(api.groceryLists.summary, { listId })).toEqual({
+      isComplete: true,
     });
   });
 });

@@ -130,6 +130,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .recipe-card { transition: transform 150ms ease, box-shadow 150ms ease; }
 .recipe-card:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgb(28 35 27 / .1); }
 .recipe-card h3 { margin: 0; font-size: 1.06rem; line-height: 1.35; letter-spacing: -.02em; }
+.recipe-selection-button:not(:disabled), .recipe-selection-button:not(:disabled) * { cursor: pointer !important; }
+.recipe-selection-button:disabled, .recipe-selection-button:disabled * { cursor: wait !important; }
 .recipe-card-actions { container-type: inline-size; }
 .recipe-card-actions > * { min-width: 0; }
 .recipe-card-book-action { min-height: 25px; border-radius: 999px; padding: .2rem .6rem; font-size: .75rem; white-space: nowrap; }

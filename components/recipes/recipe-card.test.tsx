@@ -52,6 +52,15 @@ describe("RecipeCard", () => {
     expect(screen.getByRole("button", { name: "Add to grocery list" })).toBeEnabled();
   });
 
+  it("shows the pointer cursor across selectable recipe options", () => {
+    render(<RecipeCard recipe={recipe} onSelect={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Choose Green Orzo" })).toHaveClass(
+      "recipe-selection-button",
+      "cursor-pointer",
+    );
+  });
+
   it("shows a stored meal image and falls back to the default art if it fails", () => {
     const { container } = render(
       <RecipeCard

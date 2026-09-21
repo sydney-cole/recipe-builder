@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-20T01:45:04Z
+- **Last updated:** 2026-09-21T14:46:22Z
 
 ## Log
 
@@ -305,3 +305,22 @@ Added descriptive route titles, a named collapsed Settings link, focusable skip 
 Corrected eyebrow text and focus contrast on green backgrounds, strengthened placeholders and control borders, made step numbers readable, and adjusted the narrow-screen header and decorative recipe note (`app/globals.css`, `app/(marketing)/page.tsx`).
 Made skeletons decorative and exposed loading text through status regions without permanently marking the announcements busy (`components/ui/skeleton.tsx`, `components/recipes/`, `components/grocery/`, `components/imports/`).
 Initial verification passed typecheck, lint, 169 tests, and HTML-based axe checks on four public routes; computed color-pair checks passed for the corrected text and borders. A subsequent verification passed typecheck and all 169 tests again, plus accessibility source and build-log consistency checks; ESLint completed with no errors and one unused `Check` import warning in `app/(marketing)/page.tsx`. Browser discovery still returned no connected browsers, so final live keyboard and 320px visual rechecks remain pending; authenticated browser flows also remain unverified. No deployment of these changes was verified.
+
+### 2026-09-21 - working tree
+Made Change current recipe cards expose the pointer cursor consistently across
+each selectable card and its children (`components/recipes/recipe-card.tsx`,
+`app/globals.css`).
+
+Distinguished first-time grocery-list saves from later edits. Recipe-generated
+lists persist a `needsInitialSave` marker, display Save list on their first edit,
+and clear the marker through the existing authenticated save mutation; later
+edits display Update list (`convex/schema.ts`, `convex/groceryLists.ts`,
+`components/grocery/grocery-list-editor.tsx`). Convex features: schema, table
+fields, indexed queries, mutations.
+
+Added per-card overflow actions to the Grocery lists overview so users can
+combine or delete lists without opening them. Completed lists now show an
+explicit List Completed label while retaining item progress, title truncation,
+and direct editor navigation. The completion state comes from an owned,
+index-backed Convex summary query (`components/grocery/grocery-list-card.tsx`,
+`components/grocery/grocery-list-actions.tsx`, `convex/groceryLists.ts`).

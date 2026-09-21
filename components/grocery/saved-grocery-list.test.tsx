@@ -13,10 +13,12 @@ vi.mock("@/components/grocery/grocery-list-editor", () => ({
     initialItems,
     initialName,
     listId,
+    needsInitialSave,
   }: {
     initialItems: Array<{ name: string; quantity: string; category: string; source?: string }>;
     initialName: string;
     listId: string;
+    needsInitialSave?: boolean;
   }) => (
     <div>
       <span>{listId}</span>
@@ -25,6 +27,7 @@ vi.mock("@/components/grocery/grocery-list-editor", () => ({
       <span>{initialItems[0]?.quantity}</span>
       <span>{initialItems[0]?.category}</span>
       <span>{initialItems[0]?.source}</span>
+      <span>{needsInitialSave ? "First save" : "Existing list"}</span>
     </div>
   ),
 }));
@@ -45,7 +48,7 @@ describe("SavedGroceryList", () => {
 
   it("maps persisted list items into editable display values", () => {
     mocks.queryResult = {
-      list: { _id: "list-1", name: "Saturday market", sourceRecipeTitle: "Wrong recipe" },
+      list: { _id: "list-1", name: "Saturday market", sourceRecipeTitle: "Wrong recipe", needsInitialSave: true },
       items: [
         {
           _id: "item-1",
@@ -63,6 +66,7 @@ describe("SavedGroceryList", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("Other")).toBeInTheDocument();
     expect(screen.getByText("Apple pie")).toBeInTheDocument();
+    expect(screen.getByText("First save")).toBeInTheDocument();
     expect(screen.queryByText("Wrong recipe")).not.toBeInTheDocument();
   });
 });

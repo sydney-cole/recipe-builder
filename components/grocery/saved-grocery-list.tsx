@@ -38,6 +38,7 @@ export function SavedGroceryList({ listId }: { listId: string }) {
       initialItems={items}
       initialName={data.list.name}
       listId={data.list._id}
+      needsInitialSave={data.list.needsInitialSave === true}
     />
   );
 }

@@ -55,7 +55,7 @@ export function RecipeCard({
       <Card className="recipe-card transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
         <button
           type="button"
-          className="flex h-full w-full flex-col text-left disabled:cursor-wait disabled:opacity-60"
+          className="recipe-selection-button flex h-full w-full cursor-pointer flex-col text-left disabled:cursor-wait disabled:opacity-60"
           aria-label={`Choose ${recipe.title}`}
           disabled={selectionDisabled}
           onClick={() => onSelect(recipe.id)}

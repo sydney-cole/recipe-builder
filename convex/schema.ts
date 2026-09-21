@@ -290,6 +290,7 @@ export default defineSchema({
   groceryLists: defineTable({
     userId: v.id("users"),
     clientRequestId: v.optional(v.string()),
+    needsInitialSave: v.optional(v.boolean()),
     name: v.string(),
     sourceRecipeId: v.optional(v.id("recipes")),
     sourceRecipeTitle: v.optional(v.string()),
