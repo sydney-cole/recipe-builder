@@ -76,6 +76,63 @@ describe("GroceryListActions", () => {
     );
   });
 
+  it("supports menu focus, arrow navigation, typeahead, and Escape", async () => {
+    const user = userEvent.setup();
+    render(<GroceryListActions listId="list-1" listName="Dinner" />);
+    const trigger = screen.getByRole("button", { name: "More options for Dinner" });
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    const combine = screen.getByRole("menuitem", { name: "Combine lists" });
+    const remove = screen.getByRole("menuitem", { name: "Delete list" });
+    expect(combine).toHaveFocus();
+    expect(screen.getByRole("menu", { name: "More options for Dinner" })).toHaveAttribute("id", trigger.getAttribute("aria-controls"));
+    await user.keyboard("{ArrowDown}");
+    expect(remove).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(combine).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(remove).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(combine).toHaveFocus();
+    await user.keyboard("{End}");
+    expect(remove).toHaveFocus();
+    await user.keyboard("c");
+    expect(combine).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(screen.getByRole("menuitem", { name: "Delete list" })).toHaveFocus();
+  });
+
+  it("dismisses on Tab, Shift+Tab, and outside clicks without trapping focus", async () => {
+    const user = userEvent.setup();
+    render(<><button>Before</button><GroceryListActions listId="list-1" /><button>After</button></>);
+    const trigger = screen.getByRole("button", { name: "More list options" });
+    await user.click(trigger);
+    await user.tab();
+    expect(screen.getByRole("button", { name: "After" })).toHaveFocus();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await user.click(trigger);
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Before" })).toHaveFocus();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "After" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("returns focus to the options button after cancelling a dialog", async () => {
+    const user = userEvent.setup();
+    render(<GroceryListActions listId="list-1" />);
+    const trigger = screen.getByRole("button", { name: "More list options" });
+    await user.click(trigger);
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(trigger).toHaveFocus();
+  });
+
   it("confirms deletion and returns to the grocery-list overview", async () => {
     const user = userEvent.setup();
     mocks.removeList.mockResolvedValueOnce(null);

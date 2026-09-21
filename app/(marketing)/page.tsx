@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   BookOpen,
-  Check,
   Inbox,
   Link2,
   ListChecks,

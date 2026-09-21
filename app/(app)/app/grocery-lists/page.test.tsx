@@ -63,4 +63,12 @@ describe("GroceryListsPage", () => {
       .querySelector(".card");
     expect(createCard).toHaveClass("h-64");
   });
+
+  it("keeps the editor link focus ring inside its clipping card", () => {
+    render(<GroceryListsPage />);
+    expect(screen.getByRole("link", { name: "Open Weekend trip" })).toHaveClass(
+      "focus-visible:ring-2",
+      "focus-visible:ring-inset",
+    );
+  });
 });

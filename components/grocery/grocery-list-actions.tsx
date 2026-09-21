@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { ListPlus, MoreHorizontal, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,6 +21,27 @@ export function GroceryListActions({ listId, listName }: { listId: string; listN
   const removeList = useMutation(api.groceryLists.removeList);
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuId = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const initialMenuIndex = useRef(0);
+
+  function focusTrigger() {
+    containerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+  }
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+    items?.[initialMenuIndex.current]?.focus();
+    function dismissOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !containerRef.current?.contains(event.target)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", dismissOutside);
+    return () => document.removeEventListener("pointerdown", dismissOutside);
+  }, [menuOpen]);
   const [combineOpen, setCombineOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [otherListId, setOtherListId] = useState("");
@@ -77,14 +98,32 @@ export function GroceryListActions({ listId, listName }: { listId: string; listN
 
   return (
     <>
-      <div className="relative">
+      <div
+        className="relative"
+        ref={containerRef}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
+        }}
+      >
         <Button
           variant="ghost"
           size="icon"
           aria-label={listName ? `More options for ${listName}` : "More list options"}
           aria-expanded={menuOpen}
           aria-haspopup="menu"
-          onClick={() => setMenuOpen((open) => !open)}
+          aria-controls={menuOpen ? menuId : undefined}
+          id={`${menuId}-trigger`}
+          onClick={() => {
+            initialMenuIndex.current = 0;
+            setMenuOpen((open) => !open);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              initialMenuIndex.current = event.key === "ArrowUp" ? 1 : 0;
+              setMenuOpen(true);
+            }
+          }}
         >
           <MoreHorizontal />
         </Button>
@@ -92,10 +131,38 @@ export function GroceryListActions({ listId, listName }: { listId: string; listN
           <div
             className="absolute right-0 top-11 z-20 min-w-48 rounded-xl border border-border bg-white p-2 shadow-lg"
             role="menu"
+            ref={menuRef}
+            id={menuId}
+            aria-labelledby={`${menuId}-trigger`}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" || event.key === "Tab") {
+                if (event.key === "Escape") event.preventDefault();
+                focusTrigger();
+                setMenuOpen(false);
+                return;
+              }
+              const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+              const index = items.indexOf(document.activeElement as HTMLButtonElement);
+              let next: number;
+              switch (event.key) {
+                case "ArrowDown": next = (index + 1) % items.length; break;
+                case "ArrowUp": next = (index - 1 + items.length) % items.length; break;
+                case "Home": next = 0; break;
+                case "End": next = items.length - 1; break;
+                default: {
+                  if (event.key.length !== 1 || event.key === " ") return;
+                  next = items.findIndex((item) => item.textContent?.trim().toLowerCase().startsWith(event.key.toLowerCase()));
+                  if (next < 0) return;
+                }
+              }
+              event.preventDefault();
+              items[next]?.focus();
+            }}
           >
             <button
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-surface-subtle"
               role="menuitem"
+              tabIndex={-1}
               onClick={() => {
                 setMenuOpen(false);
                 setError("");
@@ -110,6 +177,7 @@ export function GroceryListActions({ listId, listName }: { listId: string; listN
             <button
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-bold text-red-700 hover:bg-red-50"
               role="menuitem"
+              tabIndex={-1}
               onClick={() => {
                 setMenuOpen(false);
                 setError("");
@@ -124,7 +192,7 @@ export function GroceryListActions({ listId, listName }: { listId: string; listN
       </div>
 
       <Dialog open={combineOpen} onOpenChange={setCombineOpen}>
-        <DialogContent>
+        <DialogContent onCloseAutoFocus={(event) => { event.preventDefault(); focusTrigger(); }}>
           <DialogTitle>Combine grocery lists</DialogTitle>
           <DialogDescription>
             Choose another list and name the result. PerfectPlate will merge
@@ -196,7 +264,7 @@ export function GroceryListActions({ listId, listName }: { listId: string; listN
       </Dialog>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
+        <DialogContent onCloseAutoFocus={(event) => { event.preventDefault(); focusTrigger(); }}>
           <DialogTitle>Delete this grocery list?</DialogTitle>
           <DialogDescription>
             This removes the list and its items from your Grocery lists tab. It

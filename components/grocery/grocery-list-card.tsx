@@ -19,7 +19,7 @@ export function GroceryListCard({ list }: { list: Doc<"groceryLists"> }) {
         <GroceryListActions listId={list._id} listName={list.name} />
       </div>
       <Link
-        className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         href={`/app/grocery-lists/${list._id}`}
         aria-label={`Open ${list.name}`}
       >
