@@ -86,7 +86,12 @@ export const recentInboundEmails = query({
         const ownedPrimaryImport = primaryImport?.requestedBy === userId
           ? primaryImport
           : null;
-        const recipeId = ownedPrimaryImport?.recipeId;
+        const referencedRecipe = ownedPrimaryImport?.recipeId === undefined
+          ? null
+          : await ctx.db.get(ownedPrimaryImport.recipeId);
+        const recipeId = referencedRecipe !== null && referencedRecipe.deletedAt === undefined
+          ? referencedRecipe._id
+          : undefined;
         let status:
           | "received"
           | "processing"

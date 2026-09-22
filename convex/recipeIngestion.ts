@@ -78,6 +78,11 @@ type QueueRecipeSourceArgs = {
   sourceSubject?: string;
 };
 
+type StartIngestion = (
+  ctx: MutationCtx,
+  importId: Id<"recipeImports">,
+) => Promise<string>;
+
 function boundedMetadata(value: string | undefined, maximum: number) {
   const trimmed = value?.trim();
   return trimmed ? trimmed.slice(0, maximum) : undefined;
@@ -86,6 +91,7 @@ function boundedMetadata(value: string | undefined, maximum: number) {
 export async function queueRecipeSource(
   ctx: MutationCtx,
   args: QueueRecipeSourceArgs,
+  startIngestion: StartIngestion = startRecipeIngestion,
 ) {
   const normalizedUrl = normalizeRecipeUrl(args.sourceUrl);
   const existing = await ctx.db
@@ -93,8 +99,17 @@ export async function queueRecipeSource(
     .withIndex("by_requester_and_normalized_url", (q) =>
       q.eq("requestedBy", args.userId).eq("normalizedUrl", normalizedUrl),
     )
+    .order("desc")
     .first();
-  if (existing !== null) {
+  const existingRecipe = existing?.recipeId
+    ? await ctx.db.get(existing.recipeId)
+    : null;
+  const canReuseExisting =
+    existing !== null &&
+    (existing.recipeId === undefined ||
+      (existingRecipe !== null && existingRecipe.deletedAt === undefined));
+
+  if (existing !== null && canReuseExisting) {
     if (args.setAsCurrent) {
       if (existing.recipeId !== undefined) {
         await ctx.db.patch(args.userId, {
@@ -115,7 +130,7 @@ export async function queueRecipeSource(
       return { importId: existing._id, queued: false };
     }
     if (existing.workflowId === undefined) {
-      const workflowId = await startRecipeIngestion(ctx, existing._id);
+      const workflowId = await startIngestion(ctx, existing._id);
       await ctx.db.patch(existing._id, {
         workflowId,
         status: "queued",
@@ -144,7 +159,7 @@ export async function queueRecipeSource(
     createdAt: now,
     updatedAt: now,
   });
-  const workflowId = await startRecipeIngestion(ctx, importId);
+  const workflowId = await startIngestion(ctx, importId);
   await ctx.db.patch(importId, { workflowId });
   return { importId, queued: true };
 }

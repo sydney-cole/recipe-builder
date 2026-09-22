@@ -2,6 +2,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { queueRecipeSource } from "./recipeIngestion";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.*s");
@@ -282,6 +283,123 @@ describe("email functions", () => {
       api.email.recentInboundEmails,
     );
     expect(email.status).toBe("failed");
+    expect(email.recipeId).toBeUndefined();
+  });
+
+  it("reimports an emailed URL when its previous recipe was deleted", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "DeletedEmailRecipe");
+    const oldImportId = await t.run(async (ctx) => {
+      const now = Date.now();
+      const importId = await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://example.com/deleted-recipe",
+        normalizedUrl: "https://example.com/deleted-recipe",
+        sourceKind: "direct",
+        workflowId: "completed-workflow",
+        status: "completed",
+        attemptCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const recipeId = await ctx.db.insert("recipes", {
+        importId,
+        sourceUrl: "https://example.com/deleted-recipe",
+        normalizedSourceUrl: "https://example.com/deleted-recipe",
+        isPublic: false,
+        title: "Deleted recipe",
+        cuisines: [],
+        categories: [],
+        keywords: [],
+        instructions: [],
+        deletedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.patch(importId, { recipeId });
+      return importId;
+    });
+
+    const queued = await t.run(async (ctx) =>
+      queueRecipeSource(
+        ctx,
+        {
+          userId,
+          sourceUrl: "https://example.com/deleted-recipe",
+          sourceKind: "email",
+          sourceSubject: "Import this again",
+        },
+        async () => "replacement-workflow",
+      ),
+    );
+    expect(queued).toEqual({
+      importId: expect.any(String),
+      queued: true,
+    });
+
+    const imports = await t.run(async (ctx) =>
+      ctx.db
+        .query("recipeImports")
+        .withIndex("by_requester_and_normalized_url", (q) =>
+          q
+            .eq("requestedBy", userId)
+            .eq("normalizedUrl", "https://example.com/deleted-recipe"),
+        )
+        .collect(),
+    );
+    expect(imports).toHaveLength(2);
+    expect(imports.find((recipeImport) => recipeImport._id !== oldImportId)).toMatchObject({
+      sourceKind: "email",
+      status: "queued",
+    });
+  });
+
+  it("does not expose a deleted recipe through an older email record", async () => {
+    const t = initTest();
+    const userId = await createUser(t, "DeletedEmailPreview");
+    await t.run(async (ctx) => {
+      const now = Date.now();
+      const importId = await ctx.db.insert("recipeImports", {
+        requestedBy: userId,
+        sourceUrl: "https://example.com/old-email-recipe",
+        normalizedUrl: "https://example.com/old-email-recipe",
+        sourceKind: "email",
+        workflowId: "completed-workflow",
+        status: "completed",
+        attemptCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const recipeId = await ctx.db.insert("recipes", {
+        importId,
+        sourceUrl: "https://example.com/old-email-recipe",
+        normalizedSourceUrl: "https://example.com/old-email-recipe",
+        isPublic: false,
+        title: "Old email recipe",
+        cuisines: [],
+        categories: [],
+        keywords: [],
+        instructions: [],
+        deletedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.patch(importId, { recipeId });
+      await ctx.db.insert("inboundRecipeEmails", {
+        userId,
+        inboxId: "inbox-1",
+        eventId: "old-email-event",
+        receivedAt: now,
+        linkCount: 1,
+        queuedCount: 0,
+        primaryImportId: importId,
+      });
+    });
+
+    const [email] = await t.withIdentity({ subject: userId }).query(
+      api.email.recentInboundEmails,
+    );
+    expect(email.status).toBe("already_imported");
     expect(email.recipeId).toBeUndefined();
   });
 

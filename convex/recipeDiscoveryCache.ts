@@ -3,7 +3,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 
 // Bump the key when recommendation eligibility changes so stale candidates
 // that were never importability-checked are replaced immediately.
-const RECOMMENDATIONS_KEY = "daily_recommendations_v2";
+const RECOMMENDATIONS_KEY = "daily_recommendations_v4";
 const DAILY_CACHE_MS = 24 * 60 * 60 * 1_000;
 
 const discoveryResultValidator = v.object({
