@@ -12,7 +12,7 @@
 - **Auth:** Convex Auth
 - **AI models:** openai/gpt-5-mini through the direct OpenAI API; Convex AI Gateway remains configurable for a future switch
 - **Started:** 2026-09-01T21:12:33Z
-- **Last updated:** 2026-09-21T14:46:22Z
+- **Last updated:** 2026-09-22T03:05:55Z
 
 ## Log
 
@@ -306,7 +306,7 @@ Corrected eyebrow text and focus contrast on green backgrounds, strengthened pla
 Made skeletons decorative and exposed loading text through status regions without permanently marking the announcements busy (`components/ui/skeleton.tsx`, `components/recipes/`, `components/grocery/`, `components/imports/`).
 Initial verification passed typecheck, lint, 169 tests, and HTML-based axe checks on four public routes; computed color-pair checks passed for the corrected text and borders. A subsequent verification passed typecheck and all 169 tests again, plus accessibility source and build-log consistency checks; ESLint completed with no errors and one unused `Check` import warning in `app/(marketing)/page.tsx`. Browser discovery still returned no connected browsers, so final live keyboard and 320px visual rechecks remain pending; authenticated browser flows also remain unverified. No deployment of these changes was verified.
 
-### 2026-09-21 - working tree
+### 2026-09-21 - 758348e
 Made Change current recipe cards expose the pointer cursor consistently across
 each selectable card and its children (`components/recipes/recipe-card.tsx`,
 `app/globals.css`).
@@ -324,3 +324,15 @@ explicit List Completed label while retaining item progress, title truncation,
 and direct editor navigation. The completion state comes from an owned,
 index-backed Convex summary query (`components/grocery/grocery-list-card.tsx`,
 `components/grocery/grocery-list-actions.tsx`, `convex/groceryLists.ts`).
+
+### 2026-09-22 - 2ba9208
+Tested a lower-credit Firecrawl discovery path, then reverted it when stricter
+scraping produced too few complete recipes; restored the proven search and
+extraction flow and invalidated the stale daily recommendation cache
+(`convex/recipeDiscovery.ts`, `convex/recipeDiscoveryCache.ts`).
+
+Fixed forwarded-email deduplication so the newest import is considered and a
+URL whose prior recipe was deleted starts a fresh durable workflow. Inbox
+queries no longer expose deleted recipe IDs as broken preview actions. Added
+regression coverage for both cases (`convex/recipeIngestion.ts`,
+`convex/email.ts`, `convex/functions.test.ts`).
