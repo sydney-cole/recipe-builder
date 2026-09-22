@@ -3,6 +3,7 @@ import {
   buildRecipeScrapePayload,
   extractRecipeImageUrl,
   extractRecipeJsonLd,
+  parseRecipeStructuredData,
 } from "./recipeScrape";
 
 describe("recipe scrape artifact preparation", () => {
@@ -79,6 +80,44 @@ describe("recipe scrape artifact preparation", () => {
         '<script type="application/ld+json">{"@type":"Article"}</script>',
       ),
     ).toBeUndefined();
+  });
+
+  it("parses common recipe fields locally from JSON-LD", () => {
+    expect(
+      parseRecipeStructuredData(
+        JSON.stringify({
+          "@type": "Recipe",
+          name: "Roast chicken",
+          description: "A <strong>simple</strong> dinner.",
+          aggregateRating: { ratingValue: "4.8", reviewCount: "125" },
+          totalTime: "PT1H15M",
+          recipeIngredient: ["1 chicken", "2 tsp salt"],
+          recipeInstructions: [
+            { "@type": "HowToStep", text: "Heat the oven." },
+            {
+              "@type": "HowToSection",
+              itemListElement: [{ text: "Roast until golden." }],
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      title: "Roast chicken",
+      description: "A simple dinner.",
+      rating: 4.8,
+      ratingCount: 125,
+      totalTimeMinutes: 75,
+      ingredients: ["1 chicken", "2 tsp salt"],
+      instructions: ["Heat the oven.", "Roast until golden."],
+    });
+  });
+
+  it("returns null for missing or malformed recipe structured data", () => {
+    expect(parseRecipeStructuredData(undefined)).toBeNull();
+    expect(parseRecipeStructuredData("not-json")).toBeNull();
+    expect(
+      parseRecipeStructuredData(JSON.stringify({ "@type": "Article" })),
+    ).toBeNull();
   });
 
   it("bounds traversal of deeply nested page-authored JSON-LD", () => {

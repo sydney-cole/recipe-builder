@@ -84,6 +84,31 @@ describe("DiscoverForm", () => {
     expect(await screen.findByRole("dialog", { name: "Choose a recipe" })).toHaveTextContent("Lemon chicken");
   });
 
+  it("shows provider outages as a normal search result state", async () => {
+    const user = userEvent.setup();
+    mocks.search
+      .mockResolvedValueOnce({ query: "recommended", recipes: [result] })
+      .mockResolvedValueOnce({
+        query: "best rated recipe chicken",
+        recipes: [],
+        unavailable: true,
+      });
+    render(<DiscoverForm />);
+    await waitFor(() =>
+      expect(mocks.search).toHaveBeenCalledWith({
+        terms: [],
+        mode: "recommended",
+      }),
+    );
+
+    await user.type(screen.getByPlaceholderText(/chicken, broccoli/), "chicken");
+    await user.click(screen.getByRole("button", { name: "Find recipes" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Web recipe search is temporarily unavailable",
+    );
+  });
+
   it("shows a visible loading status while recipe pages are being scraped", async () => {
     const user = userEvent.setup();
     mocks.search

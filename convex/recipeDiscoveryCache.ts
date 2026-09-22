@@ -3,7 +3,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 
 // Bump the key when recommendation eligibility changes so stale candidates
 // that were never importability-checked are replaced immediately.
-const RECOMMENDATIONS_KEY = "daily_recommendations_v2";
+const RECOMMENDATIONS_KEY = "daily_recommendations_v3";
 const DAILY_CACHE_MS = 24 * 60 * 60 * 1_000;
 
 const discoveryResultValidator = v.object({
@@ -75,6 +75,65 @@ export const getDailyRecommendations = internalQuery({
       .unique();
     if (!existing || existing.refreshedAt === undefined) return null;
     return { query: existing.query, recipes: existing.recipes };
+  },
+});
+
+export const getFreshSearch = internalQuery({
+  args: {
+    key: v.string(),
+    now: v.number(),
+    maxAgeMs: v.number(),
+  },
+  returns: v.union(cachedRecommendationsValidator, v.null()),
+  handler: async (ctx, { key, now, maxAgeMs }) => {
+    const existing = await ctx.db
+      .query("recipeDiscoveryCache")
+      .withIndex("by_key", (q) => q.eq("key", key))
+      .unique();
+    if (
+      !existing ||
+      existing.refreshedAt === undefined ||
+      now - existing.refreshedAt >= maxAgeMs
+    ) {
+      return null;
+    }
+    return { query: existing.query, recipes: existing.recipes };
+  },
+});
+
+export const saveSearch = internalMutation({
+  args: {
+    key: v.string(),
+    query: v.string(),
+    recipes: v.array(discoveryResultValidator),
+  },
+  returns: v.null(),
+  handler: async (ctx, { key, query, recipes }) => {
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("recipeDiscoveryCache")
+      .withIndex("by_key", (q) => q.eq("key", key))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        query,
+        recipes,
+        lastAttemptAt: now,
+        refreshedAt: now,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("recipeDiscoveryCache", {
+        key,
+        query,
+        recipes,
+        lastAttemptAt: now,
+        refreshedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    return null;
   },
 });
 

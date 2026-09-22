@@ -11,16 +11,31 @@ import { components, internal } from "./_generated/api";
 import { action } from "./_generated/server";
 import { dailyRecommendationRefreshEnabled } from "./lib/featureFlags";
 import { isLikelyIndividualRecipePage } from "./lib/urls";
-import { buildRecipeScrapePayload } from "./lib/recipeScrape";
+import {
+  buildRecipeScrapePayload,
+  parseRecipeStructuredData,
+} from "./lib/recipeScrape";
 
 const firecrawl = new FirecrawlClient(components.firecrawl);
 const DEFAULT_DIRECT_MODEL = "gpt-5-mini";
 const DEFAULT_GATEWAY_MODEL = "openai/gpt-5-mini";
 const MAX_TERMS = 10;
-// Five evidence pages is enough to rank at most three choices while keeping
-// Firecrawl extraction and downstream model tokens bounded.
-const MAX_SEARCH_RESULTS = 5;
+const TARGET_RESULTS = 3;
+// Search costs are unchanged up to ten URLs. Scrapes are the expensive part,
+// so stop as soon as three complete recipes are found and never try more than
+// six pages for one user search.
+const MAX_SEARCH_CANDIDATES = 10;
+const MAX_CANDIDATE_SCRAPES = 6;
 const MAX_RESULT_EVIDENCE_CHARACTERS = 8_000;
+const MANUAL_SEARCH_CACHE_MS = 6 * 60 * 60 * 1_000;
+const DISCOVERY_EXCLUDED_HOSTS = new Set([
+  "facebook.com",
+  "instagram.com",
+  "pinterest.com",
+  "tiktok.com",
+  "youtube.com",
+  "youtu.be",
+]);
 
 type FirecrawlRecipe = {
   title?: string | null;
@@ -49,6 +64,7 @@ type DiscoveryResult = {
 type DiscoveryResponse = {
   query: string;
   recipes: DiscoveryResult[];
+  unavailable?: boolean;
 };
 
 type DailyCacheClaim = {
@@ -89,17 +105,7 @@ const discoveryResultSchema = z.object({
         instructions: z.array(z.string().trim().min(1).max(5_000)).min(1).max(100),
       }),
     )
-    .max(3),
-});
-
-const firecrawlRecipeSchema = z.object({
-  title: z.string().trim().min(1).max(300).nullable().optional(),
-  description: z.string().trim().max(500).nullable().optional(),
-  rating: z.number().min(0).max(5).nullable().optional(),
-  ratingCount: z.number().int().nonnegative().nullable().optional(),
-  totalTimeMinutes: z.number().int().nonnegative().max(10_080).nullable().optional(),
-  ingredients: z.array(z.string().trim().min(1).max(1_000)).max(200),
-  instructions: z.array(z.string().trim().min(1).max(5_000)).max(100),
+    .max(TARGET_RESULTS),
 });
 
 function normalizeTerms(values: string[]) {
@@ -107,6 +113,18 @@ function normalizeTerms(values: string[]) {
     .map((value) => value.trim().toLowerCase().replace(/\s+/g, " "))
     .filter((value) => value.length > 0 && value.length <= 100);
   return [...new Set(terms)].slice(0, MAX_TERMS);
+}
+
+function manualSearchCacheKey(terms: string[]) {
+  return `manual_search_v2:${JSON.stringify([...terms].sort())}`;
+}
+
+function isCompleteStructuredRecipe(recipe: FirecrawlRecipe | null) {
+  return (
+    recipe !== null &&
+    recipe.ingredients.length > 0 &&
+    recipe.instructions.length > 0
+  );
 }
 
 function sourceFromUrl(url: string) {
@@ -125,6 +143,14 @@ function validWebUrl(value: unknown): value is string {
   } catch {
     return false;
   }
+}
+
+function isDiscoveryRecipePage(url: string, title: string) {
+  if (!isLikelyIndividualRecipePage(url, title)) return false;
+  const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  return ![...DISCOVERY_EXCLUDED_HOSTS].some(
+    (excluded) => hostname === excluded || hostname.endsWith(`.${excluded}`),
+  );
 }
 
 function discoveryAgent() {
@@ -176,6 +202,7 @@ export const search = action({
   returns: v.object({
     query: v.string(),
     recipes: v.array(discoveryResultValidator),
+    unavailable: v.optional(v.boolean()),
   }),
   handler: async (ctx, { terms, mode }): Promise<DiscoveryResponse> => {
     const userId = await getAuthUserId(ctx);
@@ -187,8 +214,20 @@ export const search = action({
       throw new Error("Add at least one ingredient, flavor, cuisine, or dish");
     }
     const query = isRecommended
-      ? "highly rated individual recipe page with complete ingredients and instructions -collection -roundup"
-      : `best rated recipe ${normalizedTerms.join(" ")}`;
+      ? "highly rated individual recipe page with complete ingredients and instructions -collection -roundup -youtube -video"
+      : `best rated recipe ${normalizedTerms.join(" ")} -youtube -video`;
+
+    if (!isRecommended) {
+      const cached: DiscoveryResponse | null = await ctx.runQuery(
+        internal.recipeDiscoveryCache.getFreshSearch,
+        {
+          key: manualSearchCacheKey(normalizedTerms),
+          now: Date.now(),
+          maxAgeMs: MANUAL_SEARCH_CACHE_MS,
+        },
+      );
+      if (cached !== null) return cached;
+    }
 
     if (isRecommended) {
       if (!dailyRecommendationRefreshEnabled()) {
@@ -204,75 +243,30 @@ export const search = action({
         {},
       );
       if (!dailyCache.shouldRefresh) {
-        const validCachedRecipes = dailyCache.cached?.recipes.filter((recipe) =>
-          isLikelyIndividualRecipePage(recipe.url, recipe.title),
-        );
-        if (
-          dailyCache.cached !== null &&
-          validCachedRecipes !== undefined &&
-          validCachedRecipes.length > 0 &&
-          validCachedRecipes.length === dailyCache.cached.recipes.length
-        ) {
-          return { ...dailyCache.cached, recipes: validCachedRecipes };
-        }
-        // Replace an older cache containing roundup pages immediately rather
-        // than serving it for the remainder of the 24-hour cache window.
-        if (dailyCache.cached !== null && dailyCache.cached.recipes.length > 0) {
-          // Continue into a fresh search below.
-        } else {
-          // A concurrent request may have claimed today's refresh milliseconds
-          // earlier. Wait for it instead of starting a second web scrape.
-          for (let attempt = 0; attempt < 30; attempt += 1) {
-            await new Promise((resolve) => setTimeout(resolve, 2_000));
-            const completed: DiscoveryResponse | null = await ctx.runQuery(
-              internal.recipeDiscoveryCache.getDailyRecommendations,
-              {},
-            );
-            if (completed !== null) return completed;
-          }
-          return dailyCache.cached ?? { query, recipes: [] };
-        }
+        if (dailyCache.cached === null) return { query, recipes: [] };
+        return {
+          ...dailyCache.cached,
+          recipes: dailyCache.cached.recipes
+            .filter((recipe) => isDiscoveryRecipePage(recipe.url, recipe.title))
+            .slice(0, TARGET_RESULTS),
+        };
       }
     }
 
-    const response = await firecrawl.search(ctx, query, {
-      sources: ["web"],
-      limit: MAX_SEARCH_RESULTS,
-      ignoreInvalidURLs: true,
-      scrapeOptions: {
-        formats: [
-          "markdown",
-          {
-            type: "json",
-            prompt:
-              "Extract the recipe title, aggregate rating value and rating count, total time in minutes, short description, full ingredient lines with quantities, and complete ordered instruction steps. Use null for scalar facts not shown on the page and empty arrays when recipe details are absent.",
-            schema: {
-              type: "object",
-              properties: {
-                title: { type: ["string", "null"] },
-                rating: { type: ["number", "null"] },
-                ratingCount: { type: ["number", "null"] },
-                totalTimeMinutes: { type: ["number", "null"] },
-                description: { type: ["string", "null"] },
-                ingredients: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-                instructions: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-              },
-            },
-          },
-        ],
-        onlyMainContent: true,
-        blockAds: true,
-        removeBase64Images: true,
-      },
-    });
+    const response = await (async () => {
+      try {
+        return await firecrawl.search(ctx, query, {
+          sources: ["web"],
+          limit: MAX_SEARCH_CANDIDATES,
+          ignoreInvalidURLs: true,
+        });
+      } catch {
+        return null;
+      }
+    })();
+    if (response === null) return { query, recipes: [], unavailable: true };
 
-    const evidence = (response.web ?? [])
+    const searchResults = (response.web ?? [])
       .map((result, index) => {
         const metadata = (
           "metadata" in result ? result.metadata : undefined
@@ -290,18 +284,7 @@ export const search = action({
           (typeof result.title === "string" ? result.title : undefined) ??
           metadata?.title ??
           "Untitled recipe";
-        if (!isLikelyIndividualRecipePage(url, title)) return null;
-        const markdown =
-          "markdown" in result && typeof result.markdown === "string"
-            ? result.markdown.slice(0, MAX_RESULT_EVIDENCE_CHARACTERS)
-            : "";
-        const extracted =
-          "json" in result && result.json !== undefined
-            ? JSON.stringify(result.json).slice(0, 2_000)
-            : "not available";
-        const structuredResult = firecrawlRecipeSchema.safeParse(
-          "json" in result ? result.json : undefined,
-        );
+        if (!isDiscoveryRecipePage(url, title)) return null;
         return {
           position:
             typeof result.position === "number" ? result.position : index + 1,
@@ -313,14 +296,75 @@ export const search = action({
               : undefined) ??
             metadata?.description ??
             "",
-          extracted,
-          structured: structuredResult.success
-            ? (structuredResult.data as FirecrawlRecipe)
-            : null,
-          markdown,
         };
       })
       .filter((result): result is NonNullable<typeof result> => result !== null);
+
+    if (searchResults.length === 0) {
+      if (isRecommended) {
+        await ctx.runMutation(
+          internal.recipeDiscoveryCache.saveDailyRecommendations,
+          { query, recipes: [] },
+        );
+      } else {
+        await ctx.runMutation(internal.recipeDiscoveryCache.saveSearch, {
+          key: manualSearchCacheKey(normalizedTerms),
+          query,
+          recipes: [],
+        });
+      }
+      return { query, recipes: [] };
+    }
+
+    // Search only discovers candidate URLs. Basic scrapes cost far less than
+    // asking Search to run paid JSON extraction on every result, and the HTML
+    // already contains Schema.org Recipe data on most recipe sites.
+    const evidence: Array<
+      (typeof searchResults)[number] & {
+        extracted: string;
+        structured: FirecrawlRecipe | null;
+        markdown: string;
+      }
+    > = [];
+    let completeRecipeCount = 0;
+    let scrapeAttempts = 0;
+    for (const candidate of searchResults) {
+      if (
+        scrapeAttempts >= MAX_CANDIDATE_SCRAPES ||
+        completeRecipeCount >= TARGET_RESULTS
+      ) {
+        break;
+      }
+      scrapeAttempts += 1;
+      try {
+        const document = await firecrawl.scrape(ctx, candidate.url, {
+          formats: ["markdown", "html"],
+          onlyMainContent: false,
+          blockAds: true,
+          removeBase64Images: true,
+          maxAge: 86_400_000,
+          timeout: 60_000,
+        });
+        const payload = buildRecipeScrapePayload(
+          document as Record<string, unknown>,
+        );
+        const structured = parseRecipeStructuredData(payload.recipeJsonLd);
+        evidence.push({
+          ...candidate,
+          extracted: structured
+            ? JSON.stringify(structured).slice(0, 4_000)
+            : "not available",
+          structured,
+          markdown: payload.markdown.slice(
+            0,
+            MAX_RESULT_EVIDENCE_CHARACTERS,
+          ),
+        });
+        if (isCompleteStructuredRecipe(structured)) completeRecipeCount += 1;
+      } catch {
+        // Continue within the fixed scrape budget when a site blocks Firecrawl.
+      }
+    }
 
     if (evidence.length === 0) {
       if (isRecommended) {
@@ -328,6 +372,12 @@ export const search = action({
           internal.recipeDiscoveryCache.saveDailyRecommendations,
           { query, recipes: [] },
         );
+      } else {
+        await ctx.runMutation(internal.recipeDiscoveryCache.saveSearch, {
+          key: manualSearchCacheKey(normalizedTerms),
+          query,
+          recipes: [],
+        });
       }
       return { query, recipes: [] };
     }
@@ -421,38 +471,19 @@ ${JSON.stringify(evidence)}
         (recipe, index, all) =>
           all.findIndex((candidate) => candidate.url === recipe.url) === index,
       )
-      .slice(0, MAX_SEARCH_RESULTS);
-    const recipes: DiscoveryResult[] = isRecommended
-      ? (
-          await Promise.all(
-            candidates.map(async (candidate) => {
-              try {
-                // Use the same scrape shape as card creation. Search-result
-                // snippets can look complete even when the site blocks imports.
-                const document = await firecrawl.scrape(ctx, candidate.url, {
-                  formats: ["markdown", "html"],
-                  onlyMainContent: false,
-                  blockAds: true,
-                  removeBase64Images: true,
-                  maxAge: 3_600_000,
-                  timeout: 60_000,
-                });
-                buildRecipeScrapePayload(document as Record<string, unknown>);
-                return candidate;
-              } catch {
-                return null;
-              }
-            }),
-          )
-        )
-          .filter((recipe): recipe is DiscoveryResult => recipe !== null)
-          .slice(0, 3)
-      : candidates.slice(0, 3);
+      .slice(0, MAX_CANDIDATE_SCRAPES);
+    const recipes: DiscoveryResult[] = candidates.slice(0, TARGET_RESULTS);
     if (isRecommended) {
       await ctx.runMutation(
         internal.recipeDiscoveryCache.saveDailyRecommendations,
         { query, recipes },
       );
+    } else {
+      await ctx.runMutation(internal.recipeDiscoveryCache.saveSearch, {
+        key: manualSearchCacheKey(normalizedTerms),
+        query,
+        recipes,
+      });
     }
     return { query, recipes };
   },
