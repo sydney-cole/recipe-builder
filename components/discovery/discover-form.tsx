@@ -62,11 +62,7 @@ export function DiscoverForm() {
     const version = ++requestVersion.current;
     void searchRecipes({ terms: [], mode: "recommended" })
       .then((response) => {
-        if (requestVersion.current !== version) return;
-        setResults(response.recipes.slice(0, 3));
-        if (response.unavailable) {
-          setResultsError("We couldn’t load web recommendations right now. Please try again later.");
-        }
+        if (requestVersion.current === version) setResults(response.recipes.slice(0, 3));
       })
       .catch(() => {
         if (requestVersion.current === version) {
@@ -122,9 +118,6 @@ export function DiscoverForm() {
       const response = await searchRecipes({ terms: nextTerms, mode: "search" });
       if (requestVersion.current === version) {
         setSearchResults(response.recipes.slice(0, 3));
-        if (response.unavailable) {
-          setSearchResultsError("Web recipe search is temporarily unavailable. Please try again later.");
-        }
       }
     } catch {
       if (requestVersion.current === version) {

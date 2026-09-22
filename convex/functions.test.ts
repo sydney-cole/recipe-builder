@@ -90,59 +90,6 @@ describe("daily recipe recommendations", () => {
       cached: { query: "best rated recipes", recipes: [recipe] },
     });
   });
-
-  it("allows only one daily refresh attempt while the first is in progress", async () => {
-    const t = initTest();
-    expect(
-      await t.mutation(internal.recipeDiscoveryCache.claimDailyRefresh, {}),
-    ).toEqual({ shouldRefresh: true, cached: null });
-    expect(
-      await t.mutation(internal.recipeDiscoveryCache.claimDailyRefresh, {}),
-    ).toEqual({
-      shouldRefresh: false,
-      cached: { query: "", recipes: [] },
-    });
-  });
-
-  it("reuses a fresh manual search and expires it after the cache window", async () => {
-    const t = initTest();
-    const recipe = {
-      url: "https://example.com/chicken",
-      title: "Roast chicken",
-      description: "A weeknight dinner.",
-      source: "example.com",
-      rating: 4.8,
-      ratingCount: 125,
-      totalTimeMinutes: 45,
-      matchReason: "Matches chicken.",
-      matchedTerms: ["chicken"],
-      ingredients: ["1 chicken"],
-      instructions: ["Roast it."],
-    };
-    const key = 'manual_search_v2:["chicken"]';
-    await t.mutation(internal.recipeDiscoveryCache.saveSearch, {
-      key,
-      query: "best rated recipe chicken",
-      recipes: [recipe],
-    });
-
-    const fresh = await t.query(internal.recipeDiscoveryCache.getFreshSearch, {
-      key,
-      now: Date.now(),
-      maxAgeMs: 6 * 60 * 60 * 1_000,
-    });
-    expect(fresh).toEqual({
-      query: "best rated recipe chicken",
-      recipes: [recipe],
-    });
-
-    const expired = await t.query(internal.recipeDiscoveryCache.getFreshSearch, {
-      key,
-      now: Date.now() + 7 * 60 * 60 * 1_000,
-      maxAgeMs: 6 * 60 * 60 * 1_000,
-    });
-    expect(expired).toBeNull();
-  });
 });
 
 describe("email functions", () => {

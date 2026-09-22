@@ -20,16 +20,6 @@ export type RecipeScrapePayload = {
   truncated: boolean;
 };
 
-export type RecipeStructuredData = {
-  title: string | null;
-  description: string | null;
-  rating: number | null;
-  ratingCount: number | null;
-  totalTimeMinutes: number | null;
-  ingredients: string[];
-  instructions: string[];
-};
-
 function findRecipeNode(value: unknown) {
   const pending: unknown[] = [value];
   const seen = new WeakSet<object>();
@@ -52,102 +42,6 @@ function findRecipeNode(value: unknown) {
     }
   }
   return undefined;
-}
-
-function normalizedText(value: unknown) {
-  if (typeof value !== "string") return undefined;
-  const normalized = value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return normalized.length > 0 ? normalized : undefined;
-}
-
-function finiteNumber(value: unknown) {
-  if (typeof value !== "number" && typeof value !== "string") return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function durationMinutes(value: unknown) {
-  if (typeof value !== "string") return undefined;
-  const match = value
-    .trim()
-    .match(/^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i);
-  if (!match) return undefined;
-  const minutes =
-    Number(match[1] ?? 0) * 1_440 +
-    Number(match[2] ?? 0) * 60 +
-    Number(match[3] ?? 0) +
-    Number(match[4] ?? 0) / 60;
-  if (!Number.isFinite(minutes) || minutes < 0 || minutes > 10_080) {
-    return undefined;
-  }
-  return Math.round(minutes);
-}
-
-function instructionTexts(value: unknown): string[] {
-  if (Array.isArray(value)) return value.flatMap(instructionTexts);
-  const text = normalizedText(value);
-  if (text) return [text];
-  if (typeof value !== "object" || value === null) return [];
-  const record = value as Record<string, unknown>;
-  const directText = normalizedText(record.text);
-  if (directText) return [directText];
-  const nested = instructionTexts(record.itemListElement ?? record.steps);
-  if (nested.length > 0) return nested;
-  const name = normalizedText(record.name);
-  return name ? [name] : [];
-}
-
-/**
- * Read the common Schema.org Recipe fields locally. This avoids paying for
- * Firecrawl JSON extraction when recipe sites already publish the same data as
- * JSON-LD in their HTML.
- */
-export function parseRecipeStructuredData(
-  recipeJsonLd: string | undefined,
-): RecipeStructuredData | null {
-  if (!recipeJsonLd) return null;
-  try {
-    const recipe = findRecipeNode(JSON.parse(recipeJsonLd));
-    if (!recipe) return null;
-    const ingredients = Array.isArray(recipe.recipeIngredient)
-      ? recipe.recipeIngredient
-          .map(normalizedText)
-          .filter((value): value is string => value !== undefined)
-          .slice(0, 200)
-      : [];
-    const instructions = instructionTexts(recipe.recipeInstructions).slice(
-      0,
-      100,
-    );
-    const aggregateRating =
-      typeof recipe.aggregateRating === "object" && recipe.aggregateRating !== null
-        ? (recipe.aggregateRating as Record<string, unknown>)
-        : {};
-    const rawRating = finiteNumber(aggregateRating.ratingValue);
-    const rawRatingCount = finiteNumber(
-      aggregateRating.ratingCount ?? aggregateRating.reviewCount,
-    );
-    return {
-      title: normalizedText(recipe.name) ?? null,
-      description: normalizedText(recipe.description)?.slice(0, 500) ?? null,
-      rating:
-        rawRating !== undefined && rawRating >= 0 && rawRating <= 5
-          ? rawRating
-          : null,
-      ratingCount:
-        rawRatingCount !== undefined && rawRatingCount >= 0
-          ? Math.floor(rawRatingCount)
-          : null,
-      totalTimeMinutes: durationMinutes(recipe.totalTime) ?? null,
-      ingredients,
-      instructions,
-    };
-  } catch {
-    return null;
-  }
 }
 
 function imageCandidate(value: unknown): string | undefined {
