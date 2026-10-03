@@ -1,12 +1,8 @@
-import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
 import { v } from "convex/values";
-import { components, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, type ActionCtx } from "./_generated/server";
-import { buildRecipeScrapePayload } from "./lib/recipeScrape";
 import { isPublicUrlHostname } from "./lib/urls";
-
-const firecrawl = new FirecrawlClient(components.firecrawl);
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
@@ -82,17 +78,9 @@ export const backfillMissing = internalAction({
     let stored = 0;
     for (const recipe of recipes) {
       try {
-        const document = await firecrawl.scrape(ctx, recipe.sourceUrl, {
-          formats: ["markdown", "html"],
-          onlyMainContent: false,
-          blockAds: true,
-          removeBase64Images: true,
-          maxAge: 86_400_000,
-          timeout: 60_000,
+        const scrape = await ctx.runAction(internal.recipeWebScrape.scrapePage, {
+          url: recipe.sourceUrl,
         });
-        const scrape = buildRecipeScrapePayload(
-          document as Record<string, unknown>,
-        );
         if (!scrape.imageSourceUrl) continue;
         const imageStorageId = await storeImageFromUrl(ctx, scrape.imageSourceUrl);
         if (imageStorageId === null) continue;

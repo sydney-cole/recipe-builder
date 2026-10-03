@@ -131,9 +131,9 @@ export default defineSchema({
     .index("by_source_event", ["sourceEventId"])
     .index("by_requester_and_status", ["requestedBy", "status"]),
 
-  // Bounded source evidence produced by Firecrawl. This is intentionally kept
-  // separate from `recipes`: the future OpenAI agent consumes this artifact to
-  // create the final recipe card and grocery data.
+  // Bounded source evidence produced by the recipe page scraper. This is
+  // intentionally kept separate from `recipes`: the extraction agent consumes
+  // this artifact to create the final recipe card and grocery data.
   recipeScrapeArtifacts: defineTable({
     importId: v.id("recipeImports"),
     sourceUrl: v.string(),
@@ -147,7 +147,6 @@ export default defineSchema({
     canonicalUrl: v.optional(v.string()),
     contentType: v.optional(v.string()),
     statusCode: v.optional(v.number()),
-    firecrawlWarning: v.optional(v.string()),
     truncated: v.boolean(),
     scrapedAt: v.number(),
     createdAt: v.number(),
@@ -155,33 +154,6 @@ export default defineSchema({
   })
     .index("by_import", ["importId"])
     .index("by_normalized_url", ["normalizedUrl"]),
-
-  // Shared Discover recommendations are refreshed at most once every 24 hours.
-  // Keeping the complete cards here prevents each page visit from scraping the
-  // web and invoking the ranking agent again.
-  recipeDiscoveryCache: defineTable({
-    key: v.string(),
-    query: v.string(),
-    recipes: v.array(
-      v.object({
-        url: v.string(),
-        title: v.string(),
-        description: v.string(),
-        source: v.string(),
-        rating: v.union(v.number(), v.null()),
-        ratingCount: v.union(v.number(), v.null()),
-        totalTimeMinutes: v.union(v.number(), v.null()),
-        matchReason: v.string(),
-        matchedTerms: v.array(v.string()),
-        ingredients: v.array(v.string()),
-        instructions: v.array(v.string()),
-      }),
-    ),
-    lastAttemptAt: v.number(),
-    refreshedAt: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }).index("by_key", ["key"]),
 
   // Canonical recipe content parsed from the source page. User-specific state
   // such as notes and favorites belongs in `savedRecipes` below.

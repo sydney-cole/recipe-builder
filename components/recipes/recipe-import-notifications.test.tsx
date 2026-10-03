@@ -61,7 +61,7 @@ describe("RecipeImportNotifications", () => {
     mocks.imports = [{
       _id: "import-1",
       status: "failed",
-      errorMessage: "firecrawl_request_failed",
+      errorMessage: "recipe_scrape_failed",
     }];
     rerender(<RecipeImportNotifications />);
 

@@ -16,7 +16,6 @@ export type RecipeScrapePayload = {
   canonicalUrl?: string;
   contentType?: string;
   statusCode?: number;
-  firecrawlWarning?: string;
   truncated: boolean;
 };
 
@@ -85,7 +84,7 @@ export function extractRecipeImageUrl(
       );
       if (recipeImage) return recipeImage;
     } catch {
-      // Malformed JSON-LD falls through to Firecrawl's page metadata.
+      // Malformed JSON-LD falls through to the page's own metadata.
     }
   }
   return normalizedImageUrl(
@@ -174,7 +173,7 @@ export function extractRecipeJsonLd(html: unknown) {
 export function buildRecipeScrapePayload(document: Record<string, unknown>) {
   const markdown = optionalBoundedString(document.markdown);
   if (!markdown) {
-    throw new Error("Firecrawl did not return readable recipe content");
+    throw new Error("The recipe page did not return readable recipe content");
   }
 
   const metadata =
@@ -209,7 +208,6 @@ export function buildRecipeScrapePayload(document: Record<string, unknown>) {
     metadata.sourceURL ?? metadata.url,
   );
   payload.contentType = optionalBoundedString(metadata.contentType);
-  payload.firecrawlWarning = optionalBoundedString(document.warning);
   payload.statusCode = statusCode;
   return payload;
 }

@@ -1,4 +1,3 @@
-import { FirecrawlClient } from "@firecrawl/firecrawl-convex";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { v } from "convex/values";
@@ -11,10 +10,8 @@ import {
   mutation,
   type MutationCtx,
 } from "./_generated/server";
-import { buildRecipeScrapePayload } from "./lib/recipeScrape";
+import type { RecipeScrapePayload } from "./lib/recipeScrape";
 import { normalizeRecipeUrl } from "./lib/urls";
-
-const firecrawl = new FirecrawlClient(components.firecrawl);
 
 export const recipeIngestionWorkflow = new WorkflowManager(
   components.workflow,
@@ -41,7 +38,6 @@ const scrapeResult = v.object({
   canonicalUrl: v.optional(v.string()),
   contentType: v.optional(v.string()),
   statusCode: v.optional(v.number()),
-  firecrawlWarning: v.optional(v.string()),
   truncated: v.boolean(),
 });
 
@@ -307,22 +303,14 @@ export const markScraping = internalMutation({
 export const scrapeRecipePage = internalAction({
   args: { importId: v.id("recipeImports") },
   returns: scrapeResult,
-  handler: async (ctx, { importId }) => {
-    const recipeImport = await ctx.runQuery(
-      internal.recipeIngestion.importForScrape,
-      { importId },
-    );
+  handler: async (ctx, { importId }): Promise<RecipeScrapePayload> => {
+    const recipeImport: { sourceUrl: string; normalizedUrl: string; status: string } | null =
+      await ctx.runQuery(internal.recipeIngestion.importForScrape, { importId });
     if (recipeImport === null) throw new Error("Recipe import was not found");
 
-    const document = await firecrawl.scrape(ctx, recipeImport.normalizedUrl, {
-      formats: ["markdown", "html"],
-      onlyMainContent: false,
-      blockAds: true,
-      removeBase64Images: true,
-      maxAge: 3_600_000,
-      timeout: 60_000,
+    return await ctx.runAction(internal.recipeWebScrape.scrapePage, {
+      url: recipeImport.normalizedUrl,
     });
-    return buildRecipeScrapePayload(document as Record<string, unknown>);
   },
 });
 
@@ -454,9 +442,7 @@ export const onIngestionComplete = internalMutation({
 
     const rawMessage =
       result.kind === "failed" ? result.error : "Recipe ingestion was canceled";
-    const errorMessage = rawMessage
-      .replace(/fc-[A-Za-z0-9_-]+/g, "[redacted]")
-      .slice(0, 500);
+    const errorMessage = rawMessage.slice(0, 500);
     const now = Date.now();
     await ctx.db.patch(context.importId, {
       status: "failed",

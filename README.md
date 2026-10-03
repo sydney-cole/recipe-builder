@@ -3,9 +3,9 @@
 PerfectPlate is an email-powered recipe organizer and meal-planning application.
 The application uses Next.js, TypeScript, Tailwind CSS, and shadcn-style UI
 components with Convex for authentication, realtime data, durable recipe
-ingestion, and grocery-list workflows. Firecrawl powers live recipe discovery
-and extraction, OpenAI structures recipe cards, and AgentMail receives recipes
-forwarded to a shared inbox.
+ingestion, and grocery-list workflows. The app scrapes pasted or emailed
+recipe links directly, Anthropic's Claude structures recipe cards, and
+AgentMail receives recipes forwarded to a shared inbox.
 
 For the public hackathon deployment, follow the
 [ChatGPT Sites deployment runbook](./CHATGPT_SITES.md). The hosted Site keeps
@@ -86,13 +86,9 @@ The frontend currently includes the following responsive, navigable flows:
 - **Application shell:** responsive desktop sidebar and five-item mobile bottom
   navigation. Recipe Inbox lives with the primary destinations; Log out and
   Settings are grouped at the bottom of the desktop sidebar.
-- **Dashboard:** quick access to discovery, the shared Recipe Inbox, grocery
+- **Dashboard:** quick access to Discover, the shared Recipe Inbox, grocery
   lists, recent recipes, and a current recipe that can be viewed, changed, or
   cleared.
-- **Recipe discovery:** live Firecrawl search for ingredients, moods, and recipe
-  types, with removable search terms, an in-dialog scraping indicator, up to
-  three selectable results, and cached daily recommendations. Automatic daily
-  refresh can be paused without disabling manual searches or URL imports.
 - **Recipe Book:** Convex-backed, searchable and sortable recipe gallery with
   a three-column desktop layout, detailed recipe pages, and a selection mode for
   changing the current recipe.
@@ -104,9 +100,9 @@ The frontend currently includes the following responsive, navigable flows:
   shows received and processing states, successful recipe previews, and clear
   failures. One plausible recipe URL is selected per email, inbound events and
   notifications are deduplicated, and the same URL validation and failure rules
-  apply to both direct and email imports. Firecrawl extracts the page before the
-  OpenAI recipe agent creates a structured preview; the recipe enters the Recipe
-  Book only when the user explicitly saves it.
+  apply to both direct and email imports. The app scrapes the page before the
+  Anthropic recipe agent creates a structured preview; the recipe enters the
+  Recipe Book only when the user explicitly saves it.
 - **Grocery lists:** list overview plus an interactive editor that can add,
   rename, check off, remove, restore, and change the quantity or unit of grocery
   items. Users can create recipe-named lists from saved recipe ingredients,
@@ -133,85 +129,41 @@ npm install
 npx convex dev
 ```
 
-### Firecrawl
+### Recipe page scraping
 
-The project uses Firecrawl's official Convex component. Direct, email-forwarded,
-and trusted agent-discovered recipe URLs run through a durable workflow that
-stores bounded source evidence before agent processing. The component webhook
-is mounted at `/firecrawl/webhook` on the Convex HTTP Actions URL.
+Direct, email-forwarded, and pasted-link recipe URLs run through a durable
+workflow that fetches the page itself (`convex/recipeWebScrape.ts`), extracts
+its schema.org Recipe JSON-LD and a markdown-ish rendering of the page text,
+and stores that as bounded source evidence before agent processing. There is
+no external scraping API or API key to configure for this step; it uses the
+Convex deployment's own outbound `fetch` and the `cheerio` HTML parser.
 
-Create a Firecrawl API key and set it on your Convex development deployment:
+### Anthropic recipe agent
 
-```sh
-npx convex env set FIRECRAWL_API_KEY
-```
+After the page is scraped, the Convex Agent component uses an Anthropic Claude
+model through Anthropic's API directly (`convex/recipeAgent.ts`). It creates an
+editable recipe preview and stores its structured ingredients. The user can
+then save it to the Recipe Book, set it as current, or create a grocery list
+from its non-optional ingredients. Agent threads and messages are still
+persisted by the Convex Agent component, while normalized recipe and grocery
+data lives in the application's Convex tables.
 
-Firecrawl Agent tasks must be built with `withFirecrawlMaxCredits` from
-`convex/lib/firecrawlAgent.ts`. It adds the API's `maxCredits` request field and
-defaults to a 500-credit ceiling per agent run. Set the ceiling explicitly on
-each development and production deployment so a shared account cannot silently
-fall back to Firecrawl's larger default:
-
-```sh
-npx convex env set FIRECRAWL_AGENT_MAX_CREDITS 500
-```
-
-Values must be whole numbers from 1 through 2,500; the app rejects invalid or
-higher values. The current recipe flows use Firecrawl Search and Scrape rather
-than Firecrawl Agent, so their usage is controlled separately by bounded search
-results, cached scrapes, and the once-daily recommendations refresh.
-
-To pause the automatic daily recommendations refresh while preserving cached
-recommendations, manual searches, and link imports, set this deployment flag:
+Create an Anthropic API key and store it only on the Convex deployment:
 
 ```sh
-npx convex env set RECIPE_RECOMMENDATIONS_REFRESH_ENABLED false
+npx convex env set ANTHROPIC_API_KEY
 ```
 
-Set it back to `true` when daily recommendations should resume.
-
-For durable crawls, create a webhook secret in the Firecrawl dashboard and set
-it on the same deployment:
-
-```sh
-npx convex env set FIRECRAWL_WEBHOOK_SECRET
-```
-
-Never put either secret in Git or in client-side environment variables. Each
-developer or deployment must configure its own Convex environment variables.
-
-### OpenAI recipe agent
-
-After Firecrawl stores a recipe artifact, the Convex Agent component uses an
-OpenAI model through OpenAI's API directly. It creates an editable recipe
-preview and stores its structured ingredients. The user can then save it to the
-Recipe Book, set it as current, or create a grocery list from its non-optional
-ingredients. Agent threads and messages are still persisted by the Convex Agent
-component, while normalized recipe and grocery data lives in the application's
-Convex tables.
-
-Create an OpenAI API key and store it only on the Convex deployment:
-
-```sh
-npx convex env set OPENAI_API_KEY
-```
-
-The default direct model is `gpt-5-mini`. To use another OpenAI model, set its
+The default model is `claude-sonnet-5`. To use another Claude model, set its
 model identifier on the same deployment:
 
 ```sh
 npx convex env set RECIPE_AGENT_MODEL
 ```
 
-No OpenAI key belongs in the frontend, `.env.local`, or repository. Agent
+No Anthropic key belongs in the frontend, `.env.local`, or repository. Agent
 failures are recorded on the import, and uncertain or truncated results are
 marked as needing review.
-
-The provider selection lives in `convex/recipeAgent.ts`. A future move back to
-Convex AI Gateway requires no workflow rewrite: enable a supported Convex plan
-and set `RECIPE_AGENT_PROVIDER=convex_gateway`. The same file keeps the gateway
-adapter and normalizes `RECIPE_AGENT_MODEL` to the gateway's
-`provider/model` format.
 
 The backend exposes authenticated operations for editing recipe fields,
 instructions, ingredients, quantities, personal notes, grocery lists, and

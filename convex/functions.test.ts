@@ -55,44 +55,6 @@ async function createRecipe(
   });
 }
 
-describe("daily recipe recommendations", () => {
-  it("allows one refresh and reuses the saved recommendations for the day", async () => {
-    const t = initTest();
-    const firstClaim = await t.mutation(
-      internal.recipeDiscoveryCache.claimDailyRefresh,
-      {},
-    );
-    expect(firstClaim).toEqual({ shouldRefresh: true, cached: null });
-
-    const recipe = {
-      url: "https://example.com/daily-recipe",
-      title: "Daily recipe",
-      description: "A cached recommendation.",
-      source: "example.com",
-      rating: 4.9,
-      ratingCount: 100,
-      totalTimeMinutes: 30,
-      matchReason: "Highly rated and complete.",
-      matchedTerms: [],
-      ingredients: ["1 ingredient"],
-      instructions: ["Cook it."],
-    };
-    await t.mutation(
-      internal.recipeDiscoveryCache.saveDailyRecommendations,
-      { query: "best rated recipes", recipes: [recipe] },
-    );
-
-    const secondClaim = await t.mutation(
-      internal.recipeDiscoveryCache.claimDailyRefresh,
-      {},
-    );
-    expect(secondClaim).toEqual({
-      shouldRefresh: false,
-      cached: { query: "best rated recipes", recipes: [recipe] },
-    });
-  });
-});
-
 describe("email functions", () => {
   const configuredInbox = process.env.AGENTMAIL_INBOX_ID;
 
@@ -257,7 +219,7 @@ describe("email functions", () => {
         status: "failed",
         attemptCount: 1,
         workflowId: "failed-workflow",
-        errorMessage: "firecrawl_request_failed",
+        errorMessage: "recipe_scrape_failed",
         createdAt: now,
         updatedAt: now,
       });
@@ -726,80 +688,6 @@ describe("recipe scrape persistence", () => {
   });
 });
 
-describe("discovery recipe previews", () => {
-  it("reuses loaded search details without saving or scraping the recipe again", async () => {
-    const t = initTest();
-    const userId = await createUser(t, "Previewer");
-    const asUser = t.withIdentity({ subject: userId });
-    const args = {
-      url: "https://example.com/lemon-chicken?utm_source=search",
-      title: "Lemon chicken",
-      description: "A bright weeknight dinner.",
-      source: "Example Kitchen",
-      totalTimeMinutes: 35,
-      matchedTerms: ["chicken", "lemon"],
-      ingredients: ["1 pound chicken thighs", "1 lemon"],
-      instructions: ["Season the chicken.", "Cook and finish with lemon."],
-      sourceQuery: "chicken, lemon",
-    };
-
-    const recipeId = await asUser.mutation(
-      api.recipePreviews.createFromDiscovery,
-      args,
-    );
-    expect(
-      await asUser.mutation(api.recipePreviews.createFromDiscovery, args),
-    ).toBe(recipeId);
-    expect(await asUser.query(api.recipes.listBook)).toEqual([]);
-    expect(await asUser.query(api.recipes.get, { recipeId })).toMatchObject({
-      recipe: { title: "Lemon chicken", totalTimeMinutes: 35 },
-      ingredients: [
-        { originalText: "1 pound chicken thighs" },
-        { originalText: "1 lemon" },
-      ],
-      saved: null,
-    });
-
-    const listId = await asUser.mutation(api.groceryLists.createFromRecipe, {
-      recipeId,
-    });
-    expect(await asUser.query(api.groceryLists.summary, { listId })).toEqual({
-      isComplete: false,
-    });
-    expect(await asUser.query(api.groceryLists.get, { listId })).toMatchObject({
-      list: { name: "Lemon chicken", needsInitialSave: true },
-      items: [
-        { name: "chicken thighs" },
-        { name: "lemon" },
-      ],
-    });
-
-    const draft = await asUser.query(api.groceryLists.get, { listId });
-    expect(draft).not.toBeNull();
-    await asUser.mutation(api.groceryLists.save, {
-      listId,
-      requestId: "save-lemon-chicken-list",
-      name: "Lemon chicken",
-      items: draft!.items.map((item, index) => ({
-        itemId: item._id,
-        name: item.name,
-        quantityText: item.quantityText ?? null,
-        unit: item.unit ?? null,
-        category: item.category ?? null,
-        notes: item.notes ?? null,
-        isChecked: true,
-        sortOrder: index + 1,
-      })),
-    });
-    expect(await asUser.query(api.groceryLists.get, { listId })).toMatchObject({
-      list: { needsInitialSave: false },
-    });
-    expect(await asUser.query(api.groceryLists.summary, { listId })).toEqual({
-      isComplete: true,
-    });
-  });
-});
-
 describe("agent-generated recipe persistence", () => {
   it("creates a recipe first and adds required ingredients only on request", async () => {
     const t = initTest();
@@ -878,11 +766,11 @@ describe("agent-generated recipe persistence", () => {
 
     const first = await t.mutation(
       internal.recipeAgentData.persistGeneratedRecipe,
-      { importId, model: "openai/test-model", extraction },
+      { importId, model: "anthropic/test-model", extraction },
     );
     const second = await t.mutation(
       internal.recipeAgentData.persistGeneratedRecipe,
-      { importId, model: "openai/test-model", extraction },
+      { importId, model: "anthropic/test-model", extraction },
     );
     expect(second).toEqual(first);
 
@@ -1756,7 +1644,7 @@ describe("agent review and ingestion error branches", () => {
 
     const result = await t.mutation(
       internal.recipeAgentData.persistGeneratedRecipe,
-      { importId, model: "openai/test-model", extraction },
+      { importId, model: "anthropic/test-model", extraction },
     );
     expect(result.needsReview).toBe(true);
     await t.run(async (ctx) => {
@@ -1859,21 +1747,21 @@ describe("agent review and ingestion error branches", () => {
     await expect(
       t.mutation(internal.recipeAgentData.persistGeneratedRecipe, {
         importId: ownerlessId,
-        model: "openai/test-model",
+        model: "anthropic/test-model",
         extraction: baseExtraction,
       }),
     ).rejects.toThrow(/owning user/);
     await expect(
       t.mutation(internal.recipeAgentData.persistGeneratedRecipe, {
         importId: noArtifactId,
-        model: "openai/test-model",
+        model: "anthropic/test-model",
         extraction: baseExtraction,
       }),
     ).rejects.toThrow(/artifact/);
     await expect(
       t.mutation(internal.recipeAgentData.persistGeneratedRecipe, {
         importId: incompleteId,
-        model: "openai/test-model",
+        model: "anthropic/test-model",
         extraction: { ...baseExtraction, ingredients: [] },
       }),
     ).rejects.toThrow(/complete recipe/);

@@ -35,7 +35,7 @@ describe("recipe scrape artifact preparation", () => {
     });
   });
 
-  it("falls back to Firecrawl's Open Graph image and resolves relative URLs", () => {
+  it("falls back to the page's Open Graph image and resolves relative URLs", () => {
     expect(
       extractRecipeImageUrl(undefined, {
         sourceURL: "https://example.com/recipes/stew",

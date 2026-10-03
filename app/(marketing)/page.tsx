@@ -18,8 +18,8 @@ import { Card, CardContent } from "@/components/ui/card";
 const steps = [
   {
     icon: Search,
-    title: "Find it or bring it",
-    body: "Search by ingredient or craving, paste a recipe link, or forward one to your Recipe Inbox.",
+    title: "Bring the recipe you found",
+    body: "Paste a recipe link, or forward one to your Recipe Inbox.",
   },
   {
     icon: BookOpen,
@@ -36,8 +36,8 @@ const steps = [
 const productFeatures = [
   {
     icon: Sparkles,
-    title: "Recipe discovery that understands dinner",
-    body: "Combine ingredients, cuisines, cravings, and constraints to find a few useful matches—not an endless feed.",
+    title: "A recipe card built from any link",
+    body: "Paste a link or forward an email, and get back an editable recipe card with its ingredients ready for a grocery list.",
   },
   {
     icon: Inbox,
@@ -79,7 +79,7 @@ export default function LandingPage() {
             Recipes in.<br />Dinner figured out.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
-            Discover recipes from the web, import the ones already in your tabs or inbox, and turn tonight’s pick into a grocery list you can actually edit.
+            Import the recipes already in your tabs or inbox, and turn tonight’s pick into a grocery list you can actually edit.
           </p>
           <div className="mt-8 cluster">
             <Button asChild size="lg"><Link href="/sign-up">Build your Recipe Book<ArrowRight size={18} /></Link></Button>
@@ -132,7 +132,6 @@ export default function LandingPage() {
           <h2 className="font-display text-4xl font-semibold sm:text-5xl">Less recipe wrangling.<br />More useful planning.</h2>
           <p className="mt-5 max-w-lg leading-7 text-muted-foreground">Keep the recipes you care about moving naturally from discovery to your kitchen and grocery cart.</p>
           <div className="mt-7 flex flex-wrap gap-2 text-xs font-bold text-primary">
-            <span className="landing-pill"><Search size={14} />Web discovery</span>
             <span className="landing-pill"><Link2 size={14} />Link imports</span>
             <span className="landing-pill"><Mail size={14} />Email forwarding</span>
           </div>
@@ -150,7 +149,7 @@ export default function LandingPage() {
       <section className="landing-cta">
         <p className="eyebrow eyebrow-on-primary">Dinner starts with one good recipe</p>
         <h2 className="font-display text-4xl font-semibold sm:text-5xl">Bring yours to PerfectPlate.</h2>
-        <p className="mt-4 max-w-2xl text-white">Search for something new, paste a favorite link, or forward the recipe waiting in your inbox.</p>
+        <p className="mt-4 max-w-2xl text-white">Paste a favorite link, or forward the recipe waiting in your inbox.</p>
         <Button asChild variant="secondary" size="lg" className="mt-7"><Link href="/sign-up">Get started<ArrowRight size={18} /></Link></Button>
       </section>
 

@@ -44,7 +44,7 @@ export const ensureProcessingThread = internalMutation({
       threadId = await createThread(ctx, components.agent, {
         userId: recipeImport.requestedBy,
         title: `Recipe import ${importId}`,
-        summary: "Structured extraction of a Firecrawl recipe artifact",
+        summary: "Structured extraction of a scraped recipe artifact",
       });
     }
 

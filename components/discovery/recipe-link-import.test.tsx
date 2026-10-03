@@ -65,7 +65,7 @@ describe("RecipeLinkImport", () => {
     mocks.result.status = "failed";
     mocks.result.recipeId = "";
     (mocks.result as typeof mocks.result & { errorMessage?: string }).errorMessage =
-      "firecrawl_request_failed";
+      "recipe_scrape_failed";
     const user = userEvent.setup();
     render(<RecipeLinkImport />);
 

@@ -35,14 +35,11 @@ npx convex deploy
 Configure these secrets on the **production Convex deployment**, not in
 ChatGPT Sites and not in Git:
 
-- `OPENAI_API_KEY`
-- `FIRECRAWL_API_KEY`
-- `FIRECRAWL_WEBHOOK_SECRET`
+- `ANTHROPIC_API_KEY`
 - `AGENTMAIL_API_KEY`
 - `AGENTMAIL_INBOX_ID`
 - `AGENTMAIL_WEBHOOK_SECRET`
 - `RECIPE_AGENT_MODEL` (optional)
-- `RECIPE_AGENT_PROVIDER` (optional)
 
 After deploying, record the production URLs:
 
