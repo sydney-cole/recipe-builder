@@ -5,7 +5,10 @@ import { authTables } from "@convex-dev/auth/server";
 const importStatus = v.union(
   v.literal("queued"),
   v.literal("scraping"),
+  v.literal("scraped"),
+  v.literal("processing"),
   v.literal("parsed"),
+  v.literal("needs_review"),
   v.literal("completed"),
   v.literal("failed"),
 );
@@ -30,6 +33,28 @@ export default defineSchema({
     phoneVerificationTime: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     avatarUrl: v.optional(v.string()),
+    currentRecipeId: v.optional(v.id("recipes")),
+    deletionRequestedAt: v.optional(v.number()),
+    deletionStage: v.optional(
+      v.union(
+        v.literal("authAccounts"),
+        v.literal("authSessions"),
+        v.literal("savedRecipes"),
+        v.literal("userInboxes"),
+        v.literal("inboundEmails"),
+        v.literal("recipeImports"),
+        v.literal("groceryLists"),
+      ),
+    ),
+    // Kept temporarily so existing profiles written by the retired settings
+    // UI remain schema-compatible until their next migration.
+    notificationPreferences: v.optional(
+      v.object({
+        recipeImportReady: v.boolean(),
+        importNeedsReview: v.boolean(),
+        subscriptionNeedsAttention: v.boolean(),
+      }),
+    ),
     createdAt: v.optional(v.number()),
     updatedAt: v.optional(v.number()),
   })
@@ -48,15 +73,48 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_inbox", ["inboxId"]),
 
+  // A user-visible summary of each email delivered to a recipe inbox. Full
+  // message bodies remain isolated inside the AgentMail component; this table
+  // stores only the bounded metadata needed by the Inboxes page.
+  inboundRecipeEmails: defineTable({
+    userId: v.id("users"),
+    inboxId: v.string(),
+    eventId: v.string(),
+    messageId: v.optional(v.string()),
+    sender: v.optional(v.string()),
+    subject: v.optional(v.string()),
+    receivedAt: v.number(),
+    linkCount: v.number(),
+    queuedCount: v.number(),
+    primaryImportId: v.optional(v.id("recipeImports")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_event", ["eventId"]),
+
   // One attempt to turn a URL into a recipe. Keeping jobs separate from the
   // finished recipe makes retries and user-visible scrape errors easy to track.
   recipeImports: defineTable({
     requestedBy: v.optional(v.id("users")),
     sourceUrl: v.string(),
     normalizedUrl: v.string(),
+    sourceKind: v.optional(
+      v.union(
+        v.literal("direct"),
+        v.literal("email"),
+        v.literal("agent_discovery"),
+      ),
+    ),
+    sourceQuery: v.optional(v.string()),
+    setAsCurrent: v.optional(v.boolean()),
     status: importStatus,
     attemptCount: v.number(),
+    workflowId: v.optional(v.string()),
+    agentThreadId: v.optional(v.string()),
+    agentModel: v.optional(v.string()),
+    agentWarnings: v.optional(v.array(v.string())),
+    scrapeArtifactId: v.optional(v.id("recipeScrapeArtifacts")),
     recipeId: v.optional(v.id("recipes")),
+    generatedGroceryListId: v.optional(v.id("groceryLists")),
     errorMessage: v.optional(v.string()),
     sourceMessageId: v.optional(v.string()),
     sourceEventId: v.optional(v.string()),
@@ -73,6 +131,30 @@ export default defineSchema({
     .index("by_source_event", ["sourceEventId"])
     .index("by_requester_and_status", ["requestedBy", "status"]),
 
+  // Bounded source evidence produced by the recipe page scraper. This is
+  // intentionally kept separate from `recipes`: the extraction agent consumes
+  // this artifact to create the final recipe card and grocery data.
+  recipeScrapeArtifacts: defineTable({
+    importId: v.id("recipeImports"),
+    sourceUrl: v.string(),
+    normalizedUrl: v.string(),
+    markdown: v.string(),
+    recipeJsonLd: v.optional(v.string()),
+    imageSourceUrl: v.optional(v.string()),
+    pageTitle: v.optional(v.string()),
+    pageDescription: v.optional(v.string()),
+    pageLanguage: v.optional(v.string()),
+    canonicalUrl: v.optional(v.string()),
+    contentType: v.optional(v.string()),
+    statusCode: v.optional(v.number()),
+    truncated: v.boolean(),
+    scrapedAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_import", ["importId"])
+    .index("by_normalized_url", ["normalizedUrl"]),
+
   // Canonical recipe content parsed from the source page. User-specific state
   // such as notes and favorites belongs in `savedRecipes` below.
   recipes: defineTable({
@@ -85,6 +167,7 @@ export default defineSchema({
     title: v.string(),
     description: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
+    imageStorageId: v.optional(v.id("_storage")),
     yieldText: v.optional(v.string()),
     servings: v.optional(v.number()),
     prepTimeMinutes: v.optional(v.number()),
@@ -112,11 +195,14 @@ export default defineSchema({
         sodium: v.optional(v.string()),
       }),
     ),
+    deletedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_normalized_source_url", ["normalizedSourceUrl"])
     .index("by_public", ["isPublic"])
+    .index("by_public_and_deleted_at", ["isPublic", "deletedAt"])
+    .index("by_image_storage_id_and_deleted_at", ["imageStorageId", "deletedAt"])
     .index("by_import", ["importId"])
     .searchIndex("search_recipes", {
       searchField: "title",
@@ -175,14 +261,21 @@ export default defineSchema({
 
   groceryLists: defineTable({
     userId: v.id("users"),
+    clientRequestId: v.optional(v.string()),
+    needsInitialSave: v.optional(v.boolean()),
     name: v.string(),
+    sourceRecipeId: v.optional(v.id("recipes")),
+    sourceRecipeTitle: v.optional(v.string()),
+    sourceRecipeIds: v.optional(v.array(v.id("recipes"))),
     status: groceryListStatus,
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_and_status", ["userId", "status"]),
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_user_and_client_request", ["userId", "clientRequestId"])
+    .index("by_user_and_source_recipe", ["userId", "sourceRecipeId"]),
 
   // An item may combine the same ingredient from several recipes. The source
   // rows in `groceryListItemSources` retain that provenance.

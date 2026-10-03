@@ -1,9 +1,118 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GroceryListEditor } from "./grocery-list-editor";
 
+const mocks = vi.hoisted(() => ({
+  save: vi.fn(),
+  replace: vi.fn(),
+}));
+
+vi.mock("convex/react", () => ({
+  useMutation: () => mocks.save,
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace }),
+}));
+
 describe("GroceryListEditor", () => {
+  beforeEach(() => {
+    mocks.save.mockReset();
+    mocks.replace.mockReset();
+  });
+
+  it("starts blank when creating a manual grocery list", async () => {
+    const user = userEvent.setup();
+    render(<GroceryListEditor initialItems={[]} />);
+
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Baby spinach")).not.toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("Add an ingredient"), "Milk");
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+
+    expect(screen.getByDisplayValue("Milk")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("saves a new list and opens the saved list", async () => {
+    const user = userEvent.setup();
+    mocks.save.mockResolvedValueOnce("list-123");
+    render(<GroceryListEditor initialItems={[]} initialName="Weekend trip" />);
+
+    await user.type(screen.getByPlaceholderText("Add an ingredient"), "Milk");
+    await user.click(screen.getByRole("button", { name: "Add item" }));
+    await user.click(screen.getByRole("button", { name: "Save list" }));
+
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Weekend trip",
+        items: [expect.objectContaining({ name: "Milk", itemId: undefined })],
+      }),
+    );
+    expect(mocks.replace).toHaveBeenCalledWith("/app/grocery-lists/list-123");
+  });
+
+  it("updates an existing list with its persisted item IDs", async () => {
+    const user = userEvent.setup();
+    mocks.save.mockResolvedValueOnce("list-123");
+    render(
+      <GroceryListEditor
+        listId="list-123"
+        initialName="Recipe ingredients"
+        initialItems={[
+          {
+            id: "item-123",
+            name: "Milk",
+            quantity: "2",
+            unit: "cups",
+            category: "Dairy",
+            checked: false,
+          },
+        ]}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText("Quantity for Milk"));
+    await user.type(screen.getByLabelText("Quantity for Milk"), "3");
+    await user.click(screen.getByRole("button", { name: "Update list" }));
+
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        listId: "list-123",
+        items: [
+          expect.objectContaining({
+            itemId: "item-123",
+            name: "Milk",
+            quantityText: "3",
+          }),
+        ],
+      }),
+    );
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("labels a recipe-created draft as a first save", async () => {
+    const user = userEvent.setup();
+    mocks.save.mockResolvedValueOnce("list-123");
+    render(
+      <GroceryListEditor
+        listId="list-123"
+        needsInitialSave
+        initialName="Lemon spaghetti"
+        initialItems={[]}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Update list" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save list" }));
+
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({ listId: "list-123", name: "Lemon spaghetti" }),
+    );
+  });
+
   it("adds, edits, checks, removes, and restores an item", async () => {
     const user = userEvent.setup();
     render(<GroceryListEditor />);

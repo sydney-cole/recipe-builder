@@ -1,15 +1,147 @@
+"use client";
+
+import { useQuery } from "convex/react";
+import {
+  ArrowRight,
+  BookOpen,
+  Inbox,
+  ListChecks,
+  Search,
+} from "lucide-react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, Inbox, ListChecks, Search, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { RecipeCard } from "@/components/recipes/recipe-card";
+import { CurrentRecipePanel } from "@/components/recipes/current-recipe-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { recipes } from "@/lib/data/mock-data";
+import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/convex/_generated/api";
+import { recipeArt, recipeTotalMinutes } from "@/lib/data/recipe-view";
+import type { Recipe } from "@/lib/data/types";
 
-const quickActions = [{ href: "/app/discover", icon: Search, label: "Find a recipe", detail: "Search by ingredients or mood" }, { href: "/app/imports", icon: Inbox, label: "Import by email", detail: "Forward a recipe link" }, { href: "/app/grocery-lists/weeknight", icon: ListChecks, label: "Open grocery list", detail: "6 items left to pick up" }];
+const quickActions = [
+  {
+    href: "/app/discover",
+    icon: Search,
+    label: "Find a recipe",
+    detail: "Search by ingredients or mood",
+  },
+  {
+    href: "/app/imports",
+    icon: Inbox,
+    label: "Recipe Inbox",
+    detail: "Forward recipes by email",
+  },
+  {
+    href: "/app/grocery-lists",
+    icon: ListChecks,
+    label: "Open grocery lists",
+    detail: "Plan your next shopping trip",
+  },
+];
 
-export default function DashboardPage() { return <div className="page-container"><PageHeader eyebrow="Good afternoon" title="What are we cooking?" description="Your kitchen command center, filled with frontend-only sample data for now." actions={<Button asChild><Link href="/app/discover"><Sparkles size={17} />Discover dinner</Link></Button>} />
-  <section className="grid gap-4 md:grid-cols-3" aria-label="Quick actions">{quickActions.map(({ href, icon: Icon, label, detail }) => <Link className="quick-action" href={href} key={href}><span className="grid size-10 place-items-center rounded-lg bg-primary-soft text-primary"><Icon size={20} /></span><span><strong>{label}</strong><small>{detail}</small></span><ArrowRight className="ml-auto text-muted-foreground" size={18} /></Link>)}</section>
-  <section className="mt-10"><div className="section-row"><div><h2 className="section-heading">Recently saved</h2><p className="section-copy">Preview data while your Recipe Book is being populated.</p></div><Button asChild variant="ghost"><Link href="/app/recipe-book">View Recipe Book<ArrowRight size={16} /></Link></Button></div><div className="grid-auto">{recipes.slice(0, 3).map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} detailsHref={null} />)}</div></section>
-  <section className="mt-10 grid gap-4 lg:grid-cols-2"><Card><CardContent className="flex items-center gap-4 p-6"><span className="grid size-12 place-items-center rounded-xl bg-accent-soft text-accent"><Inbox /></span><div><p className="font-extrabold">1 import needs your attention</p><p className="text-sm text-muted-foreground">Choose the recipe link from “Weekend brunch ideas.”</p></div><Button asChild variant="secondary" size="sm" className="ml-auto"><Link href="/app/imports">Review</Link></Button></CardContent></Card><Card><CardContent className="flex items-center gap-4 p-6"><span className="grid size-12 place-items-center rounded-xl bg-aqua-soft text-primary"><BookOpen /></span><div><p className="font-extrabold">19 recipes in your book</p><p className="text-sm text-muted-foreground">Four were added this week.</p></div></CardContent></Card></section>
-  </div>; }
+function timeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+export default function DashboardPage() {
+  const user = useQuery(api.users.current);
+  const convexRecipes = useQuery(api.recipes.listRecent);
+  const savedRecipeIds = useQuery(api.recipes.savedIds);
+  const savedIdSet = savedRecipeIds === undefined ? undefined : new Set(savedRecipeIds);
+  const recipes: Array<Recipe & { isSaved: boolean }> | undefined = convexRecipes === undefined || savedIdSet === undefined ? undefined : convexRecipes.slice(0, 3).map(
+    (recipe) => ({
+      id: recipe._id,
+      title: recipe.title,
+      description:
+        recipe.description ?? "A recipe saved to your PerfectPlate collection.",
+      totalMinutes: recipeTotalMinutes(recipe),
+      servings: recipe.servings,
+      source: recipe.sourceSite ?? "Imported recipe",
+      tags: recipe.categories.slice(0, 3),
+      art: recipeArt(recipe.title),
+      imageUrl: recipe.imageUrl,
+      isSaved: savedIdSet.has(recipe._id),
+    }),
+  );
+
+  return (
+    <div className="page-container">
+      <PageHeader
+        eyebrow={`${timeGreeting()}${user?.name ? `, ${user.name.split(/\s+/)[0]}` : ""}`}
+        title="What are we cooking?"
+        description="Your kitchen command center for saved recipes and grocery planning."
+      />
+      <CurrentRecipePanel />
+      <section
+        className="mt-8 grid gap-4 md:grid-cols-3"
+        aria-label="Quick actions"
+      >
+        {quickActions.map(({ href, icon: Icon, label, detail }) => (
+          <Link className="quick-action" href={href} key={href}>
+            <span className="grid size-10 place-items-center rounded-lg bg-primary-soft text-primary">
+              <Icon size={20} />
+            </span>
+            <span>
+              <strong>{label}</strong>
+              <small>{detail}</small>
+            </span>
+            <ArrowRight className="ml-auto text-muted-foreground" size={18} />
+          </Link>
+        ))}
+      </section>
+
+      <section className="mt-10">
+        <div className="section-row">
+          <div>
+            <h2 className="section-heading">Recent recipes</h2>
+            <p className="section-copy">
+              Your newest recipe cards, whether or not they’re in your Recipe Book.
+            </p>
+          </div>
+          <Button asChild variant="ghost">
+            <Link href="/app/recipe-book">
+              View Recipe Book
+              <ArrowRight size={16} />
+            </Link>
+          </Button>
+        </div>
+        {recipes === undefined ? (
+          <div className="grid-auto" role="status" aria-live="polite">
+            <span className="sr-only">Loading recent recipes…</span>
+            {[0, 1, 2].map((item) => (
+              <Skeleton className="h-96" key={item} />
+            ))}
+          </div>
+        ) : recipes.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center sm:p-10">
+              <BookOpen className="mx-auto text-muted-foreground" />
+              <p className="mt-3 text-lg font-extrabold">Bring in your first recipe</p>
+              <p className="mx-auto mt-1 max-w-lg text-sm leading-6 text-muted-foreground">Search for something new, paste a link you already love, or forward a recipe from your inbox.</p>
+              <div className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-3">
+                <Button asChild size="sm"><Link href="/app/discover"><Search size={16} />Find recipes</Link></Button>
+                <Button asChild size="sm" variant="secondary"><Link href="/app/discover#paste-recipe">Import a link</Link></Button>
+                <Button asChild size="sm" variant="secondary"><Link href="/app/imports"><Inbox size={16} />Recipe Inbox</Link></Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid-auto">
+            {recipes.map((recipe) => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                suggested={!recipe.isSaved}
+                canCreateGroceryList
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

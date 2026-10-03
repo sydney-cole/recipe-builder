@@ -1,4 +1,4 @@
-import type { GroceryItem, Recipe, RecipeImport, Subscription } from "./types";
+import type { GroceryItem, Recipe, RecipeImport } from "./types";
 
 export const recipes: Recipe[] = [
   {
@@ -85,33 +85,6 @@ export const imports: RecipeImport[] = [
     source: "Email received yesterday",
     status: "attention",
     detail: "Choose one of 3 recipe links",
-  },
-];
-
-export const subscriptions: Subscription[] = [
-  {
-    id: "sub-1",
-    name: "Everyday Pantry",
-    domain: "everydaypantry.example",
-    status: "active",
-    lastReceived: "Today",
-    recipeCount: 12,
-  },
-  {
-    id: "sub-2",
-    name: "Sunday Simmer",
-    domain: "sundaysimmer.example",
-    status: "pending",
-    lastReceived: "Waiting for confirmation",
-    recipeCount: 0,
-  },
-  {
-    id: "sub-3",
-    name: "Morning Kitchen",
-    domain: "morningkitchen.example",
-    status: "paused",
-    lastReceived: "Aug 28",
-    recipeCount: 7,
   },
 ];
 

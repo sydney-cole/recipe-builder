@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { normalizeRecipeUrl, recipeLinksFromMessage } from "./urls";
+import {
+  isPublicUrlHostname,
+  isLikelyIndividualRecipePage,
+  normalizeRecipeUrl,
+  primaryRecipeLinkFromMessage,
+  recipeLinksFromMessage,
+} from "./urls";
 
 describe("normalizeRecipeUrl", () => {
   it("normalizes whitespace, tracking parameters, fragments, and query order", () => {
@@ -26,6 +32,44 @@ describe("normalizeRecipeUrl", () => {
       /2,048/,
     );
   });
+
+  it.each([
+    "http://localhost/recipe",
+    "http://recipes.local/dinner",
+    "http://service.internal/recipe",
+    "http://127.0.0.1/recipe",
+    "http://2130706433/recipe",
+    "http://[::1]/recipe",
+    "https://intranet/recipe",
+  ])("rejects non-public hosts: %s", (url) => {
+    expect(() => normalizeRecipeUrl(url)).toThrow(/public internet host/);
+  });
+
+  it("accepts public DNS hosts, including a trailing root label", () => {
+    expect(isPublicUrlHostname("Recipes.Example.COM.")).toBe(true);
+    expect(normalizeRecipeUrl("https://recipes.example.com./dinner")).toBe(
+      "https://recipes.example.com./dinner",
+    );
+  });
+});
+
+describe("isLikelyIndividualRecipePage", () => {
+  it.each([
+    ["https://example.com/", "Example"],
+    ["https://mypronouns.org/she", "Pronouns"],
+    ["https://example.com/collection/our-best-recipes/", "Our best recipes"],
+    ["https://example.com/25-most-popular-recipes-of-2025/", "25 Most Popular Recipes"],
+    ["https://example.com/category/dinner/", "Dinner recipes"],
+  ])("rejects roundup and listing pages: %s", (url, title) => {
+    expect(isLikelyIndividualRecipePage(url, title)).toBe(false);
+  });
+
+  it.each([
+    ["https://example.com/recipes/chicken-parmesan/", "Chicken Parmesan"],
+    ["https://example.com/best-chocolate-chip-cookies/", "Best Chocolate Chip Cookies"],
+  ])("allows plausible individual recipe pages: %s", (url, title) => {
+    expect(isLikelyIndividualRecipePage(url, title)).toBe(true);
+  });
 });
 
 describe("recipeLinksFromMessage", () => {
@@ -46,5 +90,17 @@ describe("recipeLinksFromMessage", () => {
     ).join(" ");
     expect(recipeLinksFromMessage({ text })).toHaveLength(10);
     expect(recipeLinksFromMessage(null)).toEqual([]);
+  });
+});
+
+describe("primaryRecipeLinkFromMessage", () => {
+  it("chooses one recipe URL and ignores homepage and signature links", () => {
+    expect(primaryRecipeLinkFromMessage({
+      text: [
+        "https://thecozycook.com/garlic-butter-pasta/",
+        "http://mypronouns.org/she",
+        "https://atomicobject.com/",
+      ].join(" "),
+    })).toEqual(["https://thecozycook.com/garlic-butter-pasta/"]);
   });
 });

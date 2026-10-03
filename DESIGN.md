@@ -371,7 +371,7 @@ Active navigation uses a `--primary-soft` background, `--primary` icon/text, and
 - Ingredients and instructions form two coordinated columns at wide widths; stack on mobile.
 - Ingredient checkboxes are session-local cooking aids unless explicitly saved.
 - Serving adjustment shows the original serving value and makes changed quantities obvious.
-- Mobile uses a sticky bottom action for `Add to grocery list`.
+- Mobile uses a sticky bottom action for `Create list`.
 
 ### Food-blog subscriptions
 
@@ -467,7 +467,7 @@ Do not simply shrink desktop layouts. Reorder actions so the most common mobile 
 
 - Voice: capable, warm, concise, and nonjudgmental.
 - Headings focus on an outcome: saving time, finding a recipe, or finishing a shopping trip.
-- Buttons use direct verbs: Import recipe, Save recipe, Add to list, Mark complete.
+- Buttons use direct verbs: Import recipe, Save recipe, Create list, Mark complete.
 - Avoid culinary puns in error messages.
 - Use sentence case throughout.
 - Keep helper text under 120 characters when possible.

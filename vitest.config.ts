@@ -18,10 +18,14 @@ export default defineConfig({
       include: ["components/**/*.tsx", "convex/**/*.ts", "lib/**/*.ts"],
       exclude: ["convex/_generated/**", "convex/seed.ts", "lib/data/mock-data.ts"],
       thresholds: {
-        statements: 55,
-        branches: 80,
-        functions: 70,
-        lines: 55,
+        // Vitest 5/V8 counts JSX and generated function branches more
+        // precisely than Vitest 3. Keep each floor just below the audited
+        // baseline so coverage regressions fail CI without retaining the old,
+        // incompatible branch metric.
+        statements: 70,
+        branches: 60,
+        functions: 75,
+        lines: 70,
       },
     },
   },
