@@ -2,9 +2,7 @@
 .env.local
 node_modules/
 .next/
-.open-next/
-.wrangler/
-.sites-output/
+.vercel/
 .firecrawl/
 coverage/
 *.tsbuildinfo
