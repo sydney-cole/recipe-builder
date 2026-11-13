@@ -8,6 +8,8 @@ import { isPublicUrlHostname } from "./lib/urls";
 
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 20_000;
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = [301, 302, 303, 307, 308];
 const USER_AGENT =
   "Mozilla/5.0 (compatible; PerfectPlateBot/1.0; +https://perfectplate.app)";
 
@@ -66,15 +68,30 @@ function htmlToMarkdown(html: string) {
 async function fetchHtml(url: URL) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let currentUrl = url;
   let response: Response;
   try {
-    response = await fetch(url, {
-      redirect: "follow",
-      signal: controller.signal,
-      headers: { "user-agent": USER_AGENT, accept: "text/html,*/*;q=0.8" },
-    });
-  } catch {
-    throw new Error(`recipe_scrape_failed: could not reach ${url.hostname}`);
+    for (let redirect = 0; ; redirect += 1) {
+      try {
+        // Redirects are followed by hand so every hop is checked against the
+        // same public-host rules as the original URL.
+        response = await fetch(currentUrl, {
+          redirect: "manual",
+          signal: controller.signal,
+          headers: { "user-agent": USER_AGENT, accept: "text/html,*/*;q=0.8" },
+        });
+      } catch {
+        throw new Error(
+          `recipe_scrape_failed: could not reach ${currentUrl.hostname}`,
+        );
+      }
+      if (!REDIRECT_STATUSES.includes(response.status)) break;
+      const location = response.headers.get("location");
+      if (!location || redirect === MAX_REDIRECTS) {
+        throw new Error("recipe_scrape_failed: too many or invalid redirects");
+      }
+      currentUrl = safeRecipeUrl(new URL(location, currentUrl).toString());
+    }
   } finally {
     clearTimeout(timeout);
   }
@@ -92,7 +109,7 @@ async function fetchHtml(url: URL) {
     html,
     statusCode: response.status,
     contentType,
-    finalUrl: response.url || url.toString(),
+    finalUrl: currentUrl.toString(),
   };
 }
 
@@ -112,6 +129,10 @@ export const scrapePage = internalAction({
       $('meta[property="og:description"]').attr("content")?.trim() ||
       undefined;
     const language = $("html").attr("lang")?.trim() || undefined;
+    const ogImage =
+      $('meta[property="og:image"]').attr("content")?.trim() || undefined;
+    const twitterImage =
+      $('meta[name="twitter:image"]').attr("content")?.trim() || undefined;
     const markdown = htmlToMarkdown(fetched.html);
 
     return buildRecipeScrapePayload({
@@ -121,6 +142,8 @@ export const scrapePage = internalAction({
         title,
         description,
         language,
+        ogImage,
+        twitterImage,
         sourceURL: fetched.finalUrl,
         statusCode: fetched.statusCode,
         contentType: fetched.contentType,
