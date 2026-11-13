@@ -311,4 +311,17 @@ export default defineSchema({
     .index("by_grocery_list_item", ["groceryListItemId"])
     .index("by_recipe", ["recipeId"])
     .index("by_recipe_ingredient", ["recipeIngredientId"]),
+
+  recipeSearchCache: defineTable({
+    normalizedQuery: v.string(),
+    results: v.array(
+      v.object({
+        url: v.string(),
+        title: v.string(),
+        description: v.string(),
+        source: v.string(),
+      }),
+    ),
+    createdAt: v.number(),
+  }).index("by_query", ["normalizedQuery"]),
 });
