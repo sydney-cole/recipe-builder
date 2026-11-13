@@ -95,8 +95,8 @@ The frontend currently includes the following responsive, navigable flows:
 - **Recipe details:** ingredients, cooking instructions, working serving
   controls, source attribution, equally sized save/current/grocery/source
   actions, and duplicate-grocery-list confirmation.
-- **Recipe importing:** authenticated users can paste recipe links on Discover
-  or forward recipe emails to one configured AgentMail inbox. The Recipe Inbox
+- **Recipe importing:** authenticated users can search the web for recipes or
+  paste recipe links on Discover, or forward recipe emails to one configured AgentMail inbox. The Recipe Inbox
   shows received and processing states, successful recipe previews, and clear
   failures. One plausible recipe URL is selected per email, inbound events and
   notifications are deduplicated, and the same URL validation and failure rules
@@ -137,6 +137,24 @@ its schema.org Recipe JSON-LD and a markdown-ish rendering of the page text,
 and stores that as bounded source evidence before agent processing. There is
 no external scraping API or API key to configure for this step; it uses the
 Convex deployment's own outbound `fetch` and the `cheerio` HTML parser.
+
+### Recipe search
+
+Discover can search the web for recipes through the
+[Tavily](https://www.tavily.com) search API (`convex/recipeSearch.ts`). Results
+are filtered down to individual recipe pages, and choosing one sends its URL
+through the same import workflow as a pasted link. Each distinct query is
+cached in Convex for seven days, so repeats do not use search credits.
+
+Create a Tavily API key (the free plan includes 1,000 searches a month) and
+store it on the Convex deployment:
+
+```sh
+npx convex env set TAVILY_API_KEY
+```
+
+Without the key, search shows a "not set up" message and pasted links keep
+working.
 
 ### Anthropic recipe agent
 
