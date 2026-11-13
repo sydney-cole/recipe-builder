@@ -7,9 +7,6 @@ export default defineConfig([
   ...nextTypescript,
   globalIgnores([
     ".next/**",
-    ".open-next/**",
-    ".wrangler/**",
-    ".sites-output/**",
     "coverage/**",
     "convex/_generated/**",
   ]),

@@ -7,9 +7,9 @@ ingestion, and grocery-list workflows. The app scrapes pasted or emailed
 recipe links directly, Anthropic's Claude structures recipe cards, and
 AgentMail receives recipes forwarded to a shared inbox.
 
-For the public hackathon deployment, follow the
-[ChatGPT Sites deployment runbook](./CHATGPT_SITES.md). The hosted Site keeps
-Convex as the production database and application backend.
+The frontend is hosted on Vercel at
+[perfectplate.vercel.app](https://perfectplate.vercel.app/); Convex remains the
+production database and application backend. See [Deployment](#deployment).
 
 ## Run the code locally
 
@@ -223,3 +223,26 @@ npx convex env set AGENTMAIL_WEBHOOK_SECRET
 ```
 
 Do not store the API key or webhook signing secret in `.env.local` or Git.
+
+## Deployment
+
+The Next.js frontend deploys to Vercel and the backend to Convex.
+
+In the Vercel project settings:
+
+- Set the build command to `npx convex deploy --cmd 'npm run build'` so each
+  production build deploys the Convex functions first and receives
+  `NEXT_PUBLIC_CONVEX_URL` automatically.
+- Add `CONVEX_DEPLOY_KEY` (a production deploy key from the Convex dashboard)
+  to the Production environment only.
+
+On the production Convex deployment, set the site URL used by Convex Auth,
+alongside the Anthropic and AgentMail values described above:
+
+```sh
+npx convex env set SITE_URL https://perfectplate.vercel.app --prod
+```
+
+Register the production webhook, `https://<production-deployment>.convex.site/agentmail/webhook`,
+in the AgentMail console. API keys and webhook secrets stay on the Convex
+deployment; none belong in Vercel or Git.
