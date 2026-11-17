@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: perfectplate
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npx convex deploy --cmd 'npm run build'
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: CONVEX_DEPLOY_KEY
+        sync: false

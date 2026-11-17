@@ -7,9 +7,10 @@ ingestion, and grocery-list workflows. The app scrapes pasted or emailed
 recipe links directly, Anthropic's Claude structures recipe cards, and
 AgentMail receives recipes forwarded to a shared inbox.
 
-The frontend is hosted on Vercel at
-[perfectplate.vercel.app](https://perfectplate.vercel.app/); Convex remains the
-production database and application backend. See [Deployment](#deployment).
+The frontend can be hosted on Vercel or Render, and is currently hosted on
+Vercel at [perfectplate.vercel.app](https://perfectplate.vercel.app/); Convex
+remains the production database and application backend. See
+[Deployment](#deployment).
 
 ## Run the code locally
 
@@ -263,7 +264,8 @@ Do not store the API key or webhook signing secret in `.env.local` or Git.
 
 ## Deployment
 
-The Next.js frontend deploys to Vercel and the backend to Convex.
+The Next.js frontend deploys to Vercel (or to Render; see [Render](#render))
+and the backend to Convex.
 
 In the Vercel project settings:
 
@@ -295,3 +297,31 @@ in the meantime, pass the deployment time in milliseconds, for example
 Register the production webhook, `https://<production-deployment>.convex.site/agentmail/webhook`,
 in the AgentMail console. API keys and webhook secrets stay on the Convex
 deployment; none belong in Vercel or Git.
+
+### Render
+
+The repository also includes a Render Blueprint, `render.yaml`, that runs the
+frontend as a Node web service. It uses the same build as Vercel
+(`npx convex deploy --cmd 'npm run build'`), so each deploy pushes the Convex
+functions first and builds with the production `NEXT_PUBLIC_CONVEX_URL`.
+
+1. In the Render dashboard, choose **New** → **Blueprint** and pick this
+   repository.
+2. When prompted for `CONVEX_DEPLOY_KEY`, paste a **production** deploy key
+   from the Convex dashboard. Render asks for it only when the Blueprint is
+   first created; change it later in the service's environment settings.
+3. After the first deploy, point Convex Auth at the Render URL:
+
+   ```sh
+   npx convex env set SITE_URL https://<service>.onrender.com --prod
+   ```
+
+   `SITE_URL` holds a single origin, so setting it to the Render URL replaces
+   the Vercel one for emailed links and redirects; a production Convex
+   deployment serves one frontend host at a time.
+
+The production Convex setup above (the AgentMail webhook, the one-time
+migration, and the API keys on the Convex deployment) applies to Render the
+same way. The Blueprint uses Render's free plan, which spins the service down
+when it is idle, so the first request after a quiet period waits while it
+starts again.
