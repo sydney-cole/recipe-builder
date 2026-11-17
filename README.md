@@ -16,18 +16,22 @@ production database and application backend. See [Deployment](#deployment).
 ### Prerequisites
 
 - Node.js 22 or newer
-- npm
+- Bun 1.3 or newer
 
 After cloning or pulling the repository, install the dependencies:
 
 ```sh
-npm install
+bun install
 ```
+
+`@ai-sdk/provider` and `@ai-sdk/provider-utils` are pinned to the exact
+versions the `ai` package itself depends on, so that `@convex-dev/agent`'s types
+match `ai`'s under Bun's install layout. Bump them together with `ai`.
 
 Start the Next.js development server:
 
 ```sh
-npm run dev
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in a browser. The development
@@ -38,13 +42,13 @@ The authenticated application and Recipe Book require Convex. Open a second
 terminal in the project root and run:
 
 ```sh
-npx convex dev
+bunx convex dev
 ```
 
 Keep both terminals running during full-stack development:
 
-1. `npm run dev` serves the frontend at `http://localhost:3000`.
-2. `npx convex dev` watches and deploys Convex backend changes to the configured
+1. `bun run dev` serves the frontend at `http://localhost:3000`.
+2. `bunx convex dev` watches and deploys Convex backend changes to the configured
    development deployment.
 
 ### Quality checks
@@ -52,9 +56,9 @@ Keep both terminals running during full-stack development:
 Before sharing changes, run:
 
 ```sh
-npm run typecheck
-npm run lint
-npm run build
+bun run typecheck
+bun run lint
+bun run build
 ```
 
 ### Tests
@@ -63,10 +67,10 @@ The test suite uses Vitest, Testing Library, and `convex-test`. It covers pure
 domain logic, interactive React behavior, and authenticated Convex data access.
 
 ```sh
-npm test                 # one complete run
-npm run test:watch       # rerun affected tests while developing
-npm run test:coverage    # text and HTML coverage reports
-npm run check            # typecheck, lint, and tests
+bun run test             # one complete run
+bun run test:watch       # rerun affected tests while developing
+bun run test:coverage    # text and HTML coverage reports
+bun run check            # typecheck, lint, and tests
 ```
 
 Keep tests beside the module they exercise using `*.test.ts` or `*.test.tsx`.
@@ -138,8 +142,8 @@ Install dependencies and connect the local checkout to its Convex development
 deployment:
 
 ```sh
-npm install
-npx convex dev
+bun install
+bunx convex dev
 ```
 
 ### Recipe page scraping
@@ -165,7 +169,7 @@ Create a Tavily API key (the free plan includes 1,000 searches a month) and
 store it on the Convex deployment:
 
 ```sh
-npx convex env set TAVILY_API_KEY
+bunx convex env set TAVILY_API_KEY
 ```
 
 Without the key, search shows a "not set up" message and pasted links keep
@@ -184,14 +188,14 @@ data lives in the application's Convex tables.
 Create an Anthropic API key and store it only on the Convex deployment:
 
 ```sh
-npx convex env set ANTHROPIC_API_KEY
+bunx convex env set ANTHROPIC_API_KEY
 ```
 
 The default model is `claude-sonnet-5`. To use another Claude model, set its
 model identifier on the same deployment:
 
 ```sh
-npx convex env set RECIPE_AGENT_MODEL
+bunx convex env set RECIPE_AGENT_MODEL
 ```
 
 No Anthropic key belongs in the frontend, `.env.local`, or repository. Agent
@@ -222,16 +226,16 @@ value from the command so the CLI prompts for it without placing the secret in
 your shell history:
 
 ```sh
-npx convex env set AGENTMAIL_API_KEY
-npx convex env set AGENTMAIL_INBOX_ID
+bunx convex env set AGENTMAIL_API_KEY
+bunx convex env set AGENTMAIL_INBOX_ID
 ```
 
 If you need to target a particular deployment explicitly, append its deployment
 name to both commands:
 
 ```sh
-npx convex env set AGENTMAIL_API_KEY --deployment <deployment-name>
-npx convex env set AGENTMAIL_INBOX_ID --deployment <deployment-name>
+bunx convex env set AGENTMAIL_API_KEY --deployment <deployment-name>
+bunx convex env set AGENTMAIL_INBOX_ID --deployment <deployment-name>
 ```
 
 PerfectPlate uses this single configured inbox for forwarded recipes and for
@@ -243,7 +247,7 @@ Forwards are attributed only to accounts whose email address is confirmed. The
 match still relies on the message's From address, which AgentMail does not
 authenticate for the application.
 After changing either value, run
-`npx convex dev --once` so the development backend is refreshed before testing
+`bunx convex dev --once` so the development backend is refreshed before testing
 email delivery.
 
 Register this endpoint in the AgentMail console so forwarded messages reach the
@@ -256,7 +260,7 @@ https://<your-convex-site>/agentmail/webhook
 Copy the webhook signing secret into Convex:
 
 ```sh
-npx convex env set AGENTMAIL_WEBHOOK_SECRET
+bunx convex env set AGENTMAIL_WEBHOOK_SECRET
 ```
 
 Do not store the API key or webhook signing secret in `.env.local` or Git.
@@ -267,9 +271,10 @@ The Next.js frontend deploys to Vercel and the backend to Convex.
 
 In the Vercel project settings:
 
-- Set the build command to `npx convex deploy --cmd 'npm run build'` so each
+- Set the build command to `bunx convex deploy --cmd 'bun run build'` so each
   production build deploys the Convex functions first and receives
-  `NEXT_PUBLIC_CONVEX_URL` automatically.
+  `NEXT_PUBLIC_CONVEX_URL` automatically. Vercel detects Bun from `bun.lock`
+  and uses it to install dependencies.
 - Add `CONVEX_DEPLOY_KEY` (a production deploy key from the Convex dashboard)
   to the Production environment only.
 
@@ -277,7 +282,7 @@ On the production Convex deployment, set the site URL used by Convex Auth,
 alongside the Anthropic and AgentMail values described above:
 
 ```sh
-npx convex env set SITE_URL https://perfectplate.vercel.app --prod
+bunx convex env set SITE_URL https://perfectplate.vercel.app --prod
 ```
 
 Email confirmation became a sign-up requirement after the first accounts were
@@ -285,7 +290,7 @@ created. Run this once, immediately after the first deployment that includes
 it, so those earlier accounts are treated as confirmed:
 
 ```sh
-npx convex run migrations:grandfatherEmailVerification --prod
+bunx convex run migrations:grandfatherEmailVerification --prod
 ```
 
 It is safe to run again. To run it later without confirming accounts created
