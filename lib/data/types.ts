@@ -9,6 +9,8 @@ export type Recipe = {
   art: "garden" | "citrus" | "tomato" | "berry";
   imageUrl?: string;
   isFavorite?: boolean;
+  /** Whether the user owns the recipe (removing it deletes it rather than unsaving it). */
+  canEdit?: boolean;
   matchReason?: string;
   missingIngredients?: string[];
 };

@@ -15,7 +15,7 @@ export default async function GroceryListPage({
 }) {
   const { listId } = await params;
   return (
-    <div className="page-container">
+    <div className="page-container grocery-list-page">
       <Button asChild variant="ghost" className="mb-5">
         <Link href="/app/grocery-lists">
           <ArrowLeft size={17} />

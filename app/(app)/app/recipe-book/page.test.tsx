@@ -134,4 +134,27 @@ describe("RecipeBookPage", () => {
     expect(queryState.createFromRecipe).toHaveBeenCalledWith({ recipeId: "recipe-z" });
     expect(queryState.push).toHaveBeenCalledWith("/app");
   });
+
+  it("removes a recipe from the list behind the same confirmation as its page", async () => {
+    const user = userEvent.setup();
+    queryState.value = [{ ...recipes[0], isFavorite: false, canEdit: true }, { ...recipes[1], isFavorite: false, canEdit: false }];
+    render(<RecipeBookPage />);
+
+    await user.click(screen.getByRole("button", { name: "Remove: Zucchini Pasta" }));
+    expect(screen.getByRole("heading", { name: "Remove this recipe?" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(queryState.createFromRecipe).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Remove: Apple Oats" }));
+    expect(screen.getByRole("heading", { name: "Remove from your Recipe Book?" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    expect(queryState.createFromRecipe).toHaveBeenCalledWith({ recipeId: "recipe-a" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("does not offer removal while choosing the current recipe", () => {
+    queryState.search = "select=current";
+    render(<RecipeBookPage />);
+    expect(screen.queryByRole("button", { name: /^Remove/ })).toBeNull();
+  });
 });

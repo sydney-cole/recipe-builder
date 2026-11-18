@@ -9,7 +9,8 @@ vi.mock("convex/react", () => ({
   useMutation: () => mocks.save,
   useQuery: () => null,
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const router = vi.hoisted(() => ({ replace: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: router.replace }) }));
 
 describe("RecipePreviewActions", () => {
   beforeEach(() => {
@@ -47,5 +48,17 @@ describe("RecipePreviewActions", () => {
     expect(mocks.save).toHaveBeenCalledWith({ recipeId: "recipe-1" });
     expect(await screen.findByRole("button", { name: "In Recipe Book" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("Added to your Recipe Book");
+  });
+
+  it("lets the owner discard an imported recipe after confirming", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<RecipePreviewActions recipeId={"recipe-1" as never} isSaved={false} sourceUrl="https://example.com/recipe" />);
+    expect(screen.queryByRole("button", { name: "Remove recipe" })).toBeNull();
+
+    rerender(<RecipePreviewActions recipeId={"recipe-1" as never} isSaved={false} sourceUrl="https://example.com/recipe" title="Soup" canEdit />);
+    await user.click(screen.getByRole("button", { name: "Remove recipe" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
+    expect(mocks.save).toHaveBeenCalledWith({ recipeId: "recipe-1" });
+    expect(router.replace).toHaveBeenCalledWith("/app/recipe-book");
   });
 });

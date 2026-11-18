@@ -121,4 +121,12 @@ describe("RecipeDetail", () => {
     expect(await screen.findByText("Photo added.")).toBeInTheDocument();
     vi.unstubAllGlobals();
   });
+
+  it("offers to fill the owner's recipe from a link, and a removal button of full touch size", async () => {
+    const user = userEvent.setup();
+    render(<RecipeDetail recipeId="recipe-1" />);
+    expect(screen.getByRole("button", { name: "Remove recipe" })).toHaveClass("button-destructive", "remove-recipe-button");
+    await user.click(screen.getByRole("button", { name: "Import from link" }));
+    expect(screen.getByRole("dialog", { name: "Import Tomato soup from a link" })).toBeInTheDocument();
+  });
 });

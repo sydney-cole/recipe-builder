@@ -74,7 +74,7 @@ type QueueRecipeSourceArgs = {
   sourceSubject?: string;
 };
 
-type StartIngestion = (
+export type StartIngestion = (
   ctx: MutationCtx,
   importId: Id<"recipeImports">,
 ) => Promise<string>;

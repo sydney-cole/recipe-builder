@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { ArrowLeft, BookCheck, BookMinus, BookPlus, Check, Clock3, ExternalLink, Heart, Pencil, Save, Trash2, Users } from "lucide-react";
+import { ArrowLeft, BookCheck, BookPlus, Check, Clock3, ExternalLink, Heart, Link2, Pencil, Save, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -10,29 +10,27 @@ import { AddRecipeToListButton } from "@/components/grocery/add-recipe-to-list-b
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { recipeArt, recipeTotalMinutes } from "@/lib/data/recipe-view";
 import { FoodArt } from "./food-art";
+import { ImportIntoRecipeDialog } from "./import-into-recipe-dialog";
 import { RecipeEditor } from "./recipe-editor";
 import { RecipeIngredients } from "./recipe-ingredients";
 import { CurrentRecipeButton } from "./current-recipe-button";
+import { RemoveRecipeButton } from "./remove-recipe-button";
 
 export function RecipeDetail({ recipeId }: { recipeId: string }) {
   const router = useRouter();
   const data = useQuery(api.recipes.get, { recipeId });
   const setNotes = useMutation(api.recipeCards.setNotes);
   const acknowledgeReview = useMutation(api.recipeCards.acknowledgeReview);
-  const removeCard = useMutation(api.recipeCards.removeCard);
   const addToBook = useMutation(api.recipeCards.addToBook);
-  const removeFromBook = useMutation(api.recipeCards.removeFromBook);
   const setFavorite = useMutation(api.recipeCards.setFavorite);
   const [servings, setServings] = useState<number | null>(null);
-  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
-  const [isRemoving, setIsRemoving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [returnFocusToEdit, setReturnFocusToEdit] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState("");
@@ -45,6 +43,7 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
   const recipeDocId = recipe._id as Id<"recipes">;
   const totalMinutes = recipeTotalMinutes(recipe);
   const tags = recipe.categories.length > 0 ? recipe.categories : recipe.cuisines;
+  const isEmpty = ingredients.length === 0 && recipe.instructions.length === 0;
 
   async function saveNotes() {
     const notes = notesRef.current?.value.trim() ?? "";
@@ -77,20 +76,6 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
     }
   }
 
-  async function remove() {
-    setError("");
-    setIsRemoving(true);
-    try {
-      if (canEdit) await removeCard({ recipeId: recipeDocId });
-      else await removeFromBook({ recipeId: recipeDocId });
-      router.replace("/app/recipe-book");
-    } catch {
-      setIsRemoving(false);
-      setConfirmingRemoval(false);
-      setError("We couldn’t remove this recipe.");
-    }
-  }
-
   async function toggleFavorite() {
     if (saved === null) return;
     setError("");
@@ -109,6 +94,19 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
         <Card className="mb-6 border-amber-300 bg-amber-50"><CardContent><p className="font-extrabold text-amber-950">This generated recipe card needs your review</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">{importReview.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul><Button className="mt-4" size="sm" onClick={() => void finishReview()}><Check size={16} />Mark review complete</Button></CardContent></Card>
       )}
       {(error || message) && <p className={`mb-4 rounded-lg p-3 text-sm font-semibold ${error ? "bg-red-50 text-red-700" : "bg-primary-soft text-primary"}`} role={error ? "alert" : "status"}>{error || message}</p>}
+
+      {canEdit && isEmpty && !editing && (
+        <Card className="mb-6 border-primary bg-primary-soft">
+          <CardContent>
+            <p className="font-extrabold">{recipe.title} has no ingredients or steps yet</p>
+            <p className="mt-1 text-sm">Import it from a web link, or add them yourself.</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Button onClick={() => setImporting(true)}><Link2 size={17} aria-hidden="true" />Import from link</Button>
+              <Button variant="secondary" onClick={() => { setMessage(""); setEditing(true); }}><Pencil size={17} aria-hidden="true" />Add them myself</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {editing ? (
         <RecipeEditor
@@ -136,14 +134,17 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
                 <CurrentRecipeButton recipeId={recipe._id} size="default" variant={saved === null ? "secondary" : "default"} />
                 <AddRecipeToListButton recipeId={recipe._id} variant="secondary" servings={servings ?? recipe.servings} baseServings={recipe.servings} />
               </div>
-              <div className="mt-4 flex flex-wrap items-center gap-1 border-t border-border pt-3">
+              <div className="recipe-detail-actions mt-4 flex flex-wrap items-center gap-1 border-t border-border pt-3">
                 {saved !== null && <Button variant="ghost" size="sm" aria-pressed={saved.isFavorite} onClick={() => void toggleFavorite()}><Heart size={16} fill={saved.isFavorite ? "currentColor" : "none"} />{saved.isFavorite ? "Favorited" : "Favorite"}</Button>}
                 {canEdit && <Button variant="ghost" size="sm" autoFocus={returnFocusToEdit} onClick={() => { setMessage(""); setEditing(true); }}><Pencil size={16} />Edit recipe</Button>}
+                {canEdit && !isEmpty && <Button variant="ghost" size="sm" onClick={() => setImporting(true)}><Link2 size={16} />Import from link</Button>}
                 {recipe.sourceUrl && <Button asChild variant="ghost" size="sm"><a href={recipe.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={16} />View original</a></Button>}
-                {canEdit
-                  ? <Button variant="ghost" size="sm" className="text-red-700 hover:bg-red-50" onClick={() => setConfirmingRemoval(true)}><Trash2 size={16} />Remove recipe</Button>
-                  : saved !== null && <Button variant="ghost" size="sm" className="text-red-700 hover:bg-red-50" onClick={() => setConfirmingRemoval(true)}><BookMinus size={16} />Remove from Recipe Book</Button>}
               </div>
+              {(canEdit || saved !== null) && (
+                <div className="recipe-detail-danger mt-3 border-t border-border pt-3">
+                  <RemoveRecipeButton recipeId={recipeDocId} title={recipe.title} owned={canEdit} onRemoved={() => router.replace("/app/recipe-book")} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -154,24 +155,22 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
         </>
       )}
 
+      {canEdit && (
+        <ImportIntoRecipeDialog
+          recipeId={recipeDocId}
+          title={recipe.title}
+          ingredientCount={ingredients.length}
+          instructionCount={recipe.instructions.length}
+          open={importing}
+          onOpenChange={setImporting}
+          onFilled={(text) => { setError(""); setMessage(text); }}
+        />
+      )}
+
       {saved !== null
         ? <Card className="mt-8"><CardContent><h2 className="section-heading">Personal notes</h2><p className="section-copy">Only you can see these notes.</p><textarea ref={notesRef} aria-label="Personal notes" className="input mt-4 min-h-32 w-full resize-y" maxLength={10000} defaultValue={saved.notes ?? ""} placeholder="What would you change next time?" /><Button className="mt-3" variant="secondary" onClick={() => void saveNotes()}><Save size={16} />Save notes</Button></CardContent></Card>
         : <Card className="mt-8"><CardContent><h2 className="section-heading">Personal notes</h2><p className="section-copy">Add this recipe to your Recipe Book to keep notes on it.</p></CardContent></Card>}
 
-      <Dialog open={confirmingRemoval} onOpenChange={(open) => { if (!isRemoving) setConfirmingRemoval(open); }}>
-        <DialogContent>
-          <DialogTitle>{canEdit ? "Remove this recipe?" : "Remove from your Recipe Book?"}</DialogTitle>
-          <DialogDescription>
-            {canEdit
-              ? `${recipe.title} and your notes on it will be removed. Grocery lists made from it will remain.`
-              : `${recipe.title} and your notes on it will leave your Recipe Book. Grocery lists made from it will remain.`}
-          </DialogDescription>
-          <div className="mt-6 flex justify-end gap-3">
-            <Button variant="secondary" disabled={isRemoving} onClick={() => setConfirmingRemoval(false)}>Cancel</Button>
-            <Button variant="destructive" disabled={isRemoving} onClick={() => void remove()}>{isRemoving ? "Removing…" : "Remove"}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

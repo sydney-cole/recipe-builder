@@ -2,22 +2,31 @@
 
 import { useMutation } from "convex/react";
 import { BookPlus, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AddRecipeToListButton } from "@/components/grocery/add-recipe-to-list-button";
 import { CurrentRecipeButton } from "@/components/recipes/current-recipe-button";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { RemoveRecipeButton } from "./remove-recipe-button";
 
 export function RecipePreviewActions({
   recipeId,
   isSaved,
   sourceUrl,
+  title,
+  canEdit = false,
 }: {
   recipeId: Id<"recipes">;
   isSaved: boolean;
   sourceUrl: string;
+  /** For the removal confirmation; removal is offered only with `canEdit`. */
+  title?: string;
+  /** Whether the user owns this imported recipe and so may discard it. */
+  canEdit?: boolean;
 }) {
+  const router = useRouter();
   const addToBook = useMutation(api.recipeCards.addToBook);
   const [isSaving, setIsSaving] = useState(false);
   const [savedLocally, setSavedLocally] = useState(false);
@@ -59,6 +68,11 @@ export function RecipePreviewActions({
         </p>
       )}
       {savedLocally && <p className="mt-3 text-sm font-bold text-primary" role="status">Added to your Recipe Book.</p>}
+      {canEdit && (
+        <div className="mt-4 border-t border-border pt-3">
+          <RemoveRecipeButton recipeId={recipeId} title={title ?? "This recipe"} owned onRemoved={() => router.replace("/app/recipe-book")} />
+        </div>
+      )}
     </div>
   );
 }

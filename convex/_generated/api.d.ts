@@ -26,6 +26,7 @@ import type * as lib_recipePromptSource from "../lib/recipePromptSource.js";
 import type * as lib_recipeScrape from "../lib/recipeScrape.js";
 import type * as lib_recipeSearch from "../lib/recipeSearch.js";
 import type * as lib_urls from "../lib/urls.js";
+import type * as lib_userRecipes from "../lib/userRecipes.js";
 import type * as recipeAgent from "../recipeAgent.js";
 import type * as recipeAgentData from "../recipeAgentData.js";
 import type * as recipeCards from "../recipeCards.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   "lib/recipeScrape": typeof lib_recipeScrape;
   "lib/recipeSearch": typeof lib_recipeSearch;
   "lib/urls": typeof lib_urls;
+  "lib/userRecipes": typeof lib_userRecipes;
   recipeAgent: typeof recipeAgent;
   recipeAgentData: typeof recipeAgentData;
   recipeCards: typeof recipeCards;

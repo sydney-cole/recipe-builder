@@ -12,6 +12,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { groceryCategoryOrder } from "@/convex/lib/groceryCategory";
 import type { GroceryItem } from "@/lib/data/types";
+import { UnsavedChangesBar, UnsavedNotice, useIsPhone } from "./unsaved-changes-bar";
 
 export function GroceryListEditor({
   initialItems,
@@ -44,6 +45,7 @@ export function GroceryListEditor({
     "idle" | "saving" | "saved" | "error"
   >(initialSaveState);
   const [requestId] = useState(() => crypto.randomUUID());
+  const isPhone = useIsPhone();
   const persistedItemIds = useMemo(
     () => new Set(listId === undefined ? [] : serverItems.map((item) => item.id)),
     [listId, serverItems],
@@ -193,13 +195,21 @@ export function GroceryListEditor({
     }
   }
 
+  const saveDisabled =
+    saveState === "saving" ||
+    listName.trim().length === 0 ||
+    (!dirty && !needsInitialSave);
+  const saveLabel =
+    saveState === "saving" ? "Saving…" : needsInitialSave ? "Save list" : "Update list";
+  const showBar = isPhone && canSave && dirty && saveState !== "saved";
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+    <div className={`grid gap-6 xl:grid-cols-[1fr_320px]${showBar ? " has-unsaved-bar" : ""}`}>
       <div className="stack">
         <Card>
-          <CardContent className="stack">
+          <CardContent className="grocery-head stack">
             <label>
-              <span className="mb-2 block text-sm font-extrabold">List name</span>
+              <span className="grocery-name-label mb-2 block text-sm font-extrabold">List name</span>
               <Input
                 value={listName}
                 onChange={(event) => {
@@ -209,7 +219,7 @@ export function GroceryListEditor({
                 maxLength={200}
               />
             </label>
-            <form className="flex flex-col gap-3 sm:flex-row" onSubmit={addItem}>
+            <form className="grocery-add flex flex-col gap-3 sm:flex-row" onSubmit={addItem}>
               <label className="flex-1">
                 <span className="sr-only">Ingredient name</span>
                 <Input
@@ -234,7 +244,7 @@ export function GroceryListEditor({
               {category}
             </h2>
             <Card>
-              <CardContent className="divide-y divide-border p-0">
+              <CardContent className="grocery-items divide-y divide-border">
                 {categoryItems.map((item) => (
                   <div className="grocery-row" key={item.id}>
                     <Checkbox
@@ -254,6 +264,7 @@ export function GroceryListEditor({
                     />
                     <Input
                       className="quantity-input"
+                      inputMode="decimal"
                       value={item.quantity}
                       onChange={(event) =>
                         updateItem(item.id, { quantity: event.target.value })
@@ -304,17 +315,9 @@ export function GroceryListEditor({
               />
             </div>
             {canSave && (
-              <Button
-                className="mt-5 w-full"
-                onClick={persistList}
-                disabled={saveState === "saving" || listName.trim().length === 0}
-              >
+              <Button className="mt-5 w-full" onClick={persistList} disabled={saveDisabled}>
                 <Save size={17} />
-                {saveState === "saving"
-                  ? "Saving…"
-                  : needsInitialSave
-                    ? "Save list"
-                    : "Update list"}
+                {saveLabel}
               </Button>
             )}
             {saveState === "saved" && (
@@ -323,9 +326,7 @@ export function GroceryListEditor({
               </p>
             )}
             {dirty && saveState === "idle" && (
-              <p className="mt-3 text-sm text-muted-foreground" role="status">
-                You have unsaved changes.
-              </p>
+              <UnsavedNotice className="mt-3" role="status" />
             )}
             {checkError && (
               <p className="mt-3 text-sm font-bold text-red-700" role="alert">
@@ -363,6 +364,14 @@ export function GroceryListEditor({
           </div>
         )}
       </aside>
+      {showBar && (
+        <UnsavedChangesBar>
+          <Button onClick={persistList} disabled={saveDisabled}>
+            <Save size={17} />
+            {saveLabel}
+          </Button>
+        </UnsavedChangesBar>
+      )}
     </div>
   );
 }
