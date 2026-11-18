@@ -7,10 +7,22 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { groceryCategory } from "./lib/groceryCategory";
+import {
+  canonicalIngredientName,
+  combinedNotes,
+  groceryIngredient,
+  groceryItemForDisplay,
+  ingredientMatchKey,
+  mergedAmount,
+  normalizedIngredientUnit,
+  normalizeIngredientName,
+  scaledIngredient,
+  validQuantity,
+} from "./lib/groceryMerge";
 import { parseManualIngredient } from "./lib/manualIngredient";
 import { requireUser } from "./lib/auth";
 import { canAccessRecipe } from "./lib/recipeAccess";
-import { normalizeIngredientName } from "./lib/ingredientName";
+import { notIncludedValidator } from "./lib/plannerValidators";
 
 const groceryListStatus = v.union(
   v.literal("active"),
@@ -41,6 +53,11 @@ const groceryListValidator = v.object({
   sourceRecipeIds: v.optional(v.array(v.id("recipes"))),
   status: groceryListStatus,
   completedAt: v.optional(v.number()),
+  plannerId: v.optional(v.id("planners")),
+  planWeekStart: v.optional(v.string()),
+  planSyncedAt: v.optional(v.number()),
+  planFingerprint: v.optional(v.string()),
+  planNotIncluded: v.optional(v.array(notIncludedValidator)),
   createdAt: v.number(),
   updatedAt: v.number(),
 });
@@ -58,6 +75,9 @@ const groceryListItemValidator = v.object({
   notes: v.optional(v.string()),
   isChecked: v.boolean(),
   sortOrder: v.number(),
+  planKey: v.optional(v.string()),
+  planQuantityText: v.optional(v.string()),
+  planUnit: v.optional(v.string()),
   createdAt: v.number(),
   updatedAt: v.number(),
 });
@@ -71,8 +91,6 @@ const TEXT_FIELDS = {
 type TextField = keyof typeof TEXT_FIELDS;
 
 const MAX_LIST_ITEMS = 500;
-const EGG_NAME = /^(?:(?:extra )?large|medium|small|jumbo)? ?eggs?$/;
-const PLAIN_QUANTITY_TEXT = /^\d+(?:\.\d+)?(?:\s+\d+\/\d+)?$|^\d+\/\d+$/;
 
 function optionalTextField(field: TextField, value: string | null | undefined) {
   if (value === null || value === undefined) return undefined;
@@ -110,98 +128,6 @@ function validItemName(value: string) {
   return name;
 }
 
-function comparableName(value: string) {
-  return value.replace(/[‐‑‒–—-]/g, " ").replace(/\s+/g, " ");
-}
-
-function canonicalIngredientName(value: string) {
-  const name = normalizeIngredientName(value);
-  const comparable = comparableName(name);
-
-  if (EGG_NAME.test(comparable)) return "eggs";
-  if (/^(?:all purpose )?flour$/.test(comparable)) return "flour";
-  if (/^(?:kosher )?salt$/.test(comparable)) return "salt";
-
-  return name;
-}
-
-const unitAliases: Record<string, string> = {
-  teaspoon: "tsp", teaspoons: "tsp", tsp: "tsp", tsps: "tsp",
-  tablespoon: "tbsp", tablespoons: "tbsp", tbsp: "tbsp", tbsps: "tbsp",
-  cup: "cup", cups: "cup",
-  milliliter: "ml", milliliters: "ml", millilitre: "ml", millilitres: "ml", ml: "ml",
-  liter: "l", liters: "l", litre: "l", litres: "l", l: "l",
-  gram: "g", grams: "g", g: "g",
-  kilogram: "kg", kilograms: "kg", kg: "kg",
-  ounce: "oz", ounces: "oz", oz: "oz",
-  pound: "lb", pounds: "lb", lb: "lb", lbs: "lb",
-};
-
-const unitConversions: Record<string, { family: "volume" | "weight"; factor: number }> = {
-  tsp: { family: "volume", factor: 4.92892159375 },
-  tbsp: { family: "volume", factor: 14.78676478125 },
-  cup: { family: "volume", factor: 236.5882365 },
-  ml: { family: "volume", factor: 1 },
-  l: { family: "volume", factor: 1_000 },
-  g: { family: "weight", factor: 1 },
-  kg: { family: "weight", factor: 1_000 },
-  oz: { family: "weight", factor: 28.349523125 },
-  lb: { family: "weight", factor: 453.59237 },
-};
-
-function normalizedIngredientUnit(ingredientName: string, value?: string) {
-  if (!value?.trim()) return undefined;
-  const unit = normalizeIngredientName(value).replace(/[().]/g, "").trim();
-  if (canonicalIngredientName(ingredientName) === "eggs" && EGG_NAME.test(comparableName(unit))) {
-    return undefined;
-  }
-  return unitAliases[unit] ?? unit;
-}
-
-function unitFamily(ingredientName: string, unit?: string) {
-  const normalized = normalizedIngredientUnit(ingredientName, unit);
-  if (normalized === undefined) return "count";
-  return unitConversions[normalized]?.family ?? normalized;
-}
-
-function convertQuantity(
-  quantity: number,
-  ingredientName: string,
-  fromUnit?: string,
-  toUnit?: string,
-) {
-  const from = normalizedIngredientUnit(ingredientName, fromUnit);
-  const to = normalizedIngredientUnit(ingredientName, toUnit);
-  if (from === to) return quantity;
-  if (from === undefined || to === undefined) return undefined;
-  const fromConversion = unitConversions[from];
-  const toConversion = unitConversions[to];
-  if (!fromConversion || !toConversion || fromConversion.family !== toConversion.family) {
-    return undefined;
-  }
-  return quantity * fromConversion.factor / toConversion.factor;
-}
-
-function formattedQuantity(value: number) {
-  return Number(value.toFixed(4)).toString();
-}
-
-function ingredientMatchKey(item: {
-  name: string;
-  normalizedName?: string;
-  unit?: string;
-}) {
-  const ingredient = canonicalIngredientName(item.normalizedName || item.name);
-  return `${ingredient}\u0000${unitFamily(ingredient, item.unit)}`;
-}
-
-function validQuantity(value: number) {
-  if (!Number.isFinite(value) || value < 0 || value > 1_000_000) {
-    throw new Error("Quantity must be between 0 and 1000000");
-  }
-  return value;
-}
-
 function validatedSortOrder(value: number) {
   if (!Number.isSafeInteger(value) || value < 0 || value > 100_000) {
     throw new Error("Sort order must be an integer between 0 and 100000");
@@ -217,19 +143,6 @@ function validateRequestId(value: string) {
   return requestId;
 }
 
-function strictNumericQuantity(item: {
-  quantity?: number;
-  quantityText?: string;
-}) {
-  if (item.quantity !== undefined && Number.isFinite(item.quantity)) {
-    return item.quantity;
-  }
-  const quantityText = item.quantityText?.trim();
-  if (!quantityText || !/^\d+(?:\.\d+)?$/.test(quantityText)) return undefined;
-  const parsed = Number(quantityText);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
 function validatedServingsMultiplier(value: number | undefined) {
   if (value === undefined) return 1;
   if (!Number.isFinite(value) || value < 0.01 || value > 100) {
@@ -238,17 +151,7 @@ function validatedServingsMultiplier(value: number | undefined) {
   return value;
 }
 
-function scaledIngredient<
-  T extends { quantity?: number; quantityText?: string },
->(ingredient: T, multiplier: number): T {
-  if (multiplier === 1) return ingredient;
-  const amount = strictNumericQuantity(ingredient);
-  if (amount === undefined) return ingredient;
-  const quantity = validQuantity(amount * multiplier);
-  return { ...ingredient, quantity, quantityText: formattedQuantity(quantity) };
-}
-
-async function catalogCategory(
+export async function catalogCategory(
   ctx: QueryCtx | MutationCtx,
   ingredientId: Id<"ingredients"> | undefined,
 ) {
@@ -256,79 +159,8 @@ async function catalogCategory(
   return groceryCategory((await ctx.db.get(ingredientId))?.category);
 }
 
-function displayedQuantity(item: { quantity?: number; quantityText?: string }) {
-  return item.quantityText?.trim() || item.quantity?.toString();
-}
-
-function combinedNotes(first?: string, second?: string) {
-  const notes = [first?.trim(), second?.trim()].filter(
-    (note): note is string => Boolean(note),
-  );
-  return [...new Set(notes)].join(" • ").slice(0, 500) || undefined;
-}
-
-function mergedQuantity(
-  existing: { quantity?: number; quantityText?: string; unit?: string },
-  incoming: { name: string; quantity?: number; quantityText?: string; unit?: string },
-) {
-  const currentAmount = strictNumericQuantity(existing);
-  const incomingAmount = strictNumericQuantity(incoming);
-  const convertedIncoming = incomingAmount === undefined
-    ? undefined
-    : convertQuantity(incomingAmount, incoming.name, incoming.unit, existing.unit);
-  if (currentAmount !== undefined && convertedIncoming !== undefined) {
-    const total = validQuantity(currentAmount + convertedIncoming);
-    return { quantity: total, quantityText: formattedQuantity(total) };
-  }
-  const quantities = [displayedQuantity(existing), displayedQuantity(incoming)].filter(
-    (quantity): quantity is string => Boolean(quantity),
-  );
-  return { quantity: undefined, quantityText: quantities.join(" + ").slice(0, 100) || undefined };
-}
-
-function hasQuantity(item: { quantity?: number; quantityText?: string; unit?: string }) {
-  return item.quantity !== undefined || Boolean(item.quantityText) || Boolean(item.unit);
-}
-
-function normalizedGroceryItem<
-  T extends { name: string; quantity?: number; quantityText?: string; unit?: string },
->(item: T) {
-  const lowercaseName = normalizeIngredientName(item.name);
-  const canonicalName = canonicalIngredientName(lowercaseName);
-  const name = canonicalName === "eggs" ? canonicalName : lowercaseName;
-  const quantityText =
-    item.quantity !== undefined && item.quantityText && !PLAIN_QUANTITY_TEXT.test(item.quantityText.trim())
-      ? formattedQuantity(item.quantity)
-      : item.quantityText;
-  return {
-    ...item,
-    name,
-    normalizedName: name,
-    quantityText,
-    unit: normalizedIngredientUnit(canonicalName, item.unit),
-  };
-}
-
-function groceryIngredient(item: Doc<"recipeIngredients">) {
-  if (hasQuantity(item)) return normalizedGroceryItem(item);
-  const parsed = parseManualIngredient(item.originalText);
-  if (parsed.quantity === undefined) {
-    const name = normalizeIngredientName(item.name);
-    return { ...item, name, normalizedName: name };
-  }
-  return {
-    ...item,
-    ingredientId: undefined,
-    name: parsed.name,
-    normalizedName: parsed.normalizedName,
-    quantity: parsed.quantity,
-    quantityText: parsed.quantityText,
-    unit: parsed.unit,
-    preparation: parsed.preparation,
-  };
-}
-
 type GroceryIngredient = ReturnType<typeof groceryIngredient>;
+
 type RecipeAddition = { recipeId: Id<"recipes">; multiplier: number; now: number };
 
 async function insertItemSource(
@@ -433,7 +265,7 @@ async function deleteListWithItems(
   await ctx.db.delete(list._id);
 }
 
-async function requireOwnedList(
+export async function requireOwnedList(
   ctx: QueryCtx | MutationCtx,
   userId: Id<"users">,
   listId: Id<"groceryLists">,
@@ -554,14 +386,14 @@ export const get = query({
       })),
     );
     const visibleItems = categorizedItems.map((item) => {
-      if (!sourcedItemIds.has(item._id) || hasQuantity(item)) {
-        return normalizedGroceryItem(item);
+      if (!sourcedItemIds.has(item._id) || item.quantity !== undefined || item.quantityText || item.unit) {
+        return groceryItemForDisplay(item);
       }
       const parsed = parseManualIngredient(item.name);
       if (parsed.quantity === undefined) {
-        return normalizedGroceryItem(item);
+        return groceryItemForDisplay(item);
       }
-      return normalizedGroceryItem({
+      return groceryItemForDisplay({
         ...item,
         name: parsed.name,
         normalizedName: parsed.normalizedName,
@@ -718,12 +550,10 @@ export const addRecipeToList = mutation({
       const sources = await ctx.db.query("groceryListItemSources").withIndex("by_grocery_list_item", (q) => q.eq("groceryListItemId", existing._id)).take(100);
       if (sources.some((source) => source.recipeId === recipeId)) continue;
       const canonicalName = canonicalIngredientName(ingredient.name);
-      const targetUnit = normalizedIngredientUnit(canonicalName, existing.unit);
       await ctx.db.patch(existing._id, {
-        ...mergedQuantity({ ...existing, unit: targetUnit }, ingredient),
         name: canonicalName,
         normalizedName: canonicalName,
-        unit: targetUnit,
+        ...mergedAmount(canonicalName, existing, ingredient),
         notes: combinedNotes(existing.notes, ingredient.notes),
         isChecked: false,
         updatedAt: now,
@@ -904,7 +734,9 @@ export const combineLists = mutation({
         continue;
       }
 
-      Object.assign(existing, mergedQuantity(existing, item));
+      const amount = mergedAmount(item.name, existing, item);
+      existing.quantity = amount.quantity;
+      existing.quantityText = amount.quantityText;
       existing.notes = combinedNotes(existing.notes, item.notes);
       const canonicalName = canonicalIngredientName(item.name);
       existing.name = canonicalName;

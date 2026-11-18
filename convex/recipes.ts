@@ -69,6 +69,8 @@ const recipeIngredientValidator = v.object({
 const bookRecipeValidator = v.object({
   ...recipeValidator.fields,
   isFavorite: v.boolean(),
+  /** Whether this user owns the recipe, so removing it deletes it rather than only unsaving it. */
+  canEdit: v.boolean(),
 });
 
 const RECIPE_BOOK_LIMIT = 500;
@@ -146,10 +148,14 @@ export const listBook = query({
           (entry): entry is { recipe: Doc<"recipes">; isFavorite: boolean } =>
             entry.recipe !== null && entry.recipe.deletedAt === undefined,
         )
-        .map(async ({ recipe, isFavorite }) => ({
-          ...(await recipeView(ctx, recipe)),
-          isFavorite,
-        })),
+        .map(async ({ recipe, isFavorite }) => {
+          const recipeImport = recipe.importId === undefined ? null : await ctx.db.get(recipe.importId);
+          return {
+            ...(await recipeView(ctx, recipe)),
+            isFavorite,
+            canEdit: recipeImport?.requestedBy === userId,
+          };
+        }),
     );
   },
 });

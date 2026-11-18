@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GroceryListEditor } from "./grocery-list-editor";
 
 const mocks = vi.hoisted(() => ({
@@ -184,5 +184,87 @@ describe("GroceryListEditor", () => {
     expect(within(status).getByText(/Avocados/)).toBeInTheDocument();
     await user.click(within(status).getByRole("button", { name: "Undo" }));
     expect(screen.getByDisplayValue("Avocados")).toBeInTheDocument();
+  });
+  it("takes server changes for rows not edited here and keeps local edits", async () => {
+    const user = userEvent.setup();
+    const item = (id: string, name: string, quantity: string) => ({ id, name, quantity, unit: "cup", category: "Pantry", checked: false });
+    const { rerender } = render(
+      <GroceryListEditor listId="list-1" initialItems={[item("item-1", "beans", "2"), item("item-2", "rice", "1")]} />,
+    );
+    const rice = screen.getByRole("textbox", { name: "Quantity for rice" });
+    await user.clear(rice);
+    await user.type(rice, "5");
+
+    rerender(
+      <GroceryListEditor listId="list-1" initialItems={[item("item-1", "beans", "4"), item("item-2", "rice", "2")]} />,
+    );
+    expect(screen.getByRole("textbox", { name: "Quantity for beans" })).toHaveValue("4");
+    expect(screen.getByRole("textbox", { name: "Quantity for rice" })).toHaveValue("5");
+  });
+
+  it("says which meals an item is for and what the plan now needs", () => {
+    render(
+      <GroceryListEditor
+        listId="list-1"
+        sourceLabel="For"
+        initialItems={[{ id: "item-1", name: "beans", quantity: "3", unit: "cans", category: "Pantry", checked: false, source: "Chili, Soup", planAmount: "4 cup" }]}
+      />,
+    );
+    expect(screen.getByText("For Chili, Soup · Plan now needs 4 cup")).toBeInTheDocument();
+  });
+
+  describe("unsaved changes", () => {
+    const milk = { id: "item-1", name: "Milk", quantity: "2", unit: "cups", category: "Dairy", checked: false };
+    const phone = (matches: boolean) => {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: matches && query === "(max-width: 767px)",
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+    };
+    const original = window.matchMedia;
+    afterEach(() => {
+      window.matchMedia = original;
+    });
+
+    it("shows a bold danger notice with an icon in the summary panel", async () => {
+      const user = userEvent.setup();
+      render(<GroceryListEditor listId="list-1" initialItems={[milk]} />);
+      await user.type(screen.getByLabelText("Quantity for Milk"), "5");
+      const notice = screen.getByRole("status");
+      expect(notice).toHaveTextContent("You have unsaved changes.");
+      expect(notice).toHaveClass("grocery-unsaved");
+      expect(notice.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("pins a bar with the notice and Update list above the phone navigation while there are changes", async () => {
+      const user = userEvent.setup();
+      phone(true);
+      mocks.save.mockResolvedValue("list-1");
+      const { container } = render(<GroceryListEditor listId="list-1" initialItems={[milk]} />);
+      expect(screen.queryByRole("region", { name: "Unsaved changes" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Update list" })).toBeDisabled();
+
+      await user.type(screen.getByLabelText("Quantity for Milk"), "5");
+      const bar = screen.getByRole("region", { name: "Unsaved changes" });
+      expect(bar).toHaveTextContent("You have unsaved changes.");
+      expect(container.firstElementChild).toHaveClass("has-unsaved-bar");
+      expect(screen.getAllByRole("button", { name: "Update list" })).toHaveLength(2);
+
+      await user.click(within(bar).getByRole("button", { name: "Update list" }));
+      expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ listId: "list-1" }));
+      expect(screen.queryByRole("region", { name: "Unsaved changes" })).toBeNull();
+      expect(container.firstElementChild).not.toHaveClass("has-unsaved-bar");
+    });
+
+    it("keeps the bar off wider screens", async () => {
+      const user = userEvent.setup();
+      phone(false);
+      render(<GroceryListEditor listId="list-1" initialItems={[milk]} />);
+      await user.type(screen.getByLabelText("Quantity for Milk"), "5");
+      expect(screen.queryByRole("region", { name: "Unsaved changes" })).toBeNull();
+      expect(screen.getAllByRole("button", { name: "Update list" })).toHaveLength(1);
+    });
   });
 });

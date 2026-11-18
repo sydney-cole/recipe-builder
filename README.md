@@ -99,6 +99,16 @@ The frontend currently includes the following responsive, navigable flows:
   favorites, a tag filter, a three-column desktop layout, detailed recipe
   pages, and a selection mode for changing the current recipe. The book lists
   the 500 most recently saved recipes and says so when that limit is reached.
+- **Weekly planner:** plan breakfast, lunch, and dinner a week at a time,
+  choosing which meals to plan and the day the week starts. Each meal is Cook,
+  Leftovers, Eat out, or Skip. A Cook meal can use a saved recipe, a new recipe
+  created from the typed name, or a recipe imported from a pasted link; a
+  recipe with no ingredients yet can be filled in later from a web link. A
+  week can be copied from an earlier one, and the last change can be undone.
+  Home shows today's planned meals. The planner builds one grocery list per
+  week from its Cook meals, scaled to the number of people and the leftovers
+  each meal covers, and can update that list when the plan changes while
+  keeping items added or edited by hand.
 - **Recipe details:** ingredients, cooking instructions, serving controls that
   show kitchen fractions and carry the chosen serving count into a grocery
   list, source attribution, favorites, save/current/grocery/source actions,

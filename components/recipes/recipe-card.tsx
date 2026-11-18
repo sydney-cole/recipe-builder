@@ -13,6 +13,7 @@ import type { Recipe } from "@/lib/data/types";
 import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { CurrentRecipeButton } from "./current-recipe-button";
+import { RemoveRecipeButton } from "./remove-recipe-button";
 
 export function RecipeCard({
   recipe,
@@ -22,6 +23,7 @@ export function RecipeCard({
   onSelect,
   isSelecting = false,
   selectionDisabled = false,
+  removable = false,
 }: {
   recipe: Recipe;
   suggested?: boolean;
@@ -30,6 +32,8 @@ export function RecipeCard({
   onSelect?: (recipeId: string) => void;
   isSelecting?: boolean;
   selectionDisabled?: boolean;
+  /** Offer removal from the card (the Recipe Book list), behind the usual confirmation. */
+  removable?: boolean;
 }) {
   const [savedLocally, setSavedLocally] = useState(false);
   const saved = !suggested || savedLocally;
@@ -134,6 +138,11 @@ export function RecipeCard({
         {favoriteError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t update your favorites. Try again.</p>}
         {saveError && <p className="text-xs font-bold text-red-700" role="alert">Couldn&apos;t add this recipe to your book. Try again.</p>}
         <p className="text-xs text-muted-foreground">Source: {recipe.source}</p>
+        {removable && (
+          <div className="recipe-card-remove border-t border-border pt-3">
+            <RemoveRecipeButton className="w-full" recipeId={recipe.id as Id<"recipes">} title={recipe.title} owned={recipe.canEdit === true} label="Remove" />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

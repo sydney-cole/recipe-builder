@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./app-shell";
@@ -56,6 +56,27 @@ describe("AppShell", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't sign out");
     expect(screen.getByRole("button", { name: "Log out" })).toBeEnabled();
     expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("puts the planner in the sidebar and the mobile bar, with Discover under More", async () => {
+    const user = userEvent.setup();
+    mocks.pathname = "/app/planner";
+    render(<AppShell><p>Kitchen content</p></AppShell>);
+
+    const sidebar = screen.getByRole("complementary", { name: "Main navigation" });
+    expect(within(sidebar).getByRole("link", { name: "Planner" })).toHaveAttribute("aria-current", "page");
+    const mobile = screen.getByRole("navigation", { name: "Mobile navigation" });
+    expect(within(mobile).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Home",
+      "Planner",
+      "Recipe Book",
+      "Grocery",
+    ]);
+    expect(within(mobile).getByRole("link", { name: "Planner" })).toHaveAttribute("href", "/app/planner");
+
+    await user.click(screen.getByRole("button", { name: "More navigation" }));
+    const more = screen.getByRole("navigation", { name: "More navigation options" });
+    expect(within(more).getByRole("link", { name: "Discover" })).toHaveAttribute("href", "/app/discover");
   });
 
   it("exposes the inbox, settings, and sign out from mobile navigation", async () => {

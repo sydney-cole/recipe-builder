@@ -663,7 +663,40 @@ describe("user settings", () => {
         createdAt: now,
         updatedAt: now,
       });
-      return { savedRecipeId, groceryListId, inboxId };
+      const plannerId = await ctx.db.insert("planners", {
+        ownerId: userId,
+        weekStart: 1,
+        people: 2,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const plannerMealId = await ctx.db.insert("plannerMeals", {
+        plannerId,
+        name: "Thai",
+        key: "thai",
+        createdBy: userId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const cookSlotId = await ctx.db.insert("planSlots", {
+        plannerId,
+        date: "2026-11-16",
+        meal: "lunch",
+        type: "cook",
+        recipeId,
+        updatedBy: userId,
+        updatedAt: now,
+      });
+      const outSlotId = await ctx.db.insert("planSlots", {
+        plannerId,
+        date: "2026-11-16",
+        meal: "dinner",
+        type: "out",
+        mealId: plannerMealId,
+        updatedBy: userId,
+        updatedAt: now,
+      });
+      return { savedRecipeId, groceryListId, inboxId, plannerId, plannerMealId, cookSlotId, outSlotId };
     });
 
     vi.useFakeTimers();

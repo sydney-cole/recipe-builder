@@ -40,9 +40,11 @@ export function GroceryListCard({ list }: { list: Doc<"groceryLists"> }) {
             {list.name}
           </h2>
           <p className="mt-1 truncate text-sm text-muted-foreground">
-            {list.sourceRecipeTitle
-              ? `From ${list.sourceRecipeTitle}`
-              : "Manual grocery list"}
+            {list.plannerId !== undefined
+              ? "From your meal plan"
+              : list.sourceRecipeTitle
+                ? `From ${list.sourceRecipeTitle}`
+                : "Manual grocery list"}
           </p>
           <div className="mt-auto">
             {progress && progress.total > 0 && (

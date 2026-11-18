@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { BookOpen, Compass, Home, Inbox, ListChecks, LogOut, MoreHorizontal, Settings } from "lucide-react";
+import { BookOpen, CalendarDays, Compass, Home, Inbox, ListChecks, LogOut, MoreHorizontal, Settings } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -12,11 +12,16 @@ import { RecipeImportNotifications } from "@/components/recipes/recipe-import-no
 
 const primary = [
   { href: "/app", label: "Home", icon: Home, exact: true },
+  { href: "/app/planner", label: "Planner", icon: CalendarDays },
   { href: "/app/discover", label: "Discover", icon: Compass },
   { href: "/app/recipe-book", label: "Recipe Book", icon: BookOpen },
   { href: "/app/grocery-lists", label: "Grocery", icon: ListChecks },
   { href: "/app/imports", label: "Recipe Inbox", icon: Inbox },
 ];
+
+// The mobile bar holds four destinations plus More. Planning is a daily
+// destination and Discover an occasional one, so Discover moves to More.
+const mobilePrimary = primary.filter((item) => ["/app", "/app/planner", "/app/recipe-book", "/app/grocery-lists"].includes(item.href));
 
 function NavItem({ item, mobile = false }: { item: (typeof primary)[number]; mobile?: boolean }) {
   const pathname = usePathname();
@@ -77,7 +82,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        {primary.slice(0, 4).map((item) => <NavItem key={item.href} item={item} mobile />)}
+        {mobilePrimary.map((item) => <NavItem key={item.href} item={item} mobile />)}
         <button type="button" className="nav-link" aria-label="More navigation" onClick={() => setMobileMenuOpen(true)}>
           <MoreHorizontal size={20} strokeWidth={1.9} />
           <span className="nav-label">More</span>
@@ -86,8 +91,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <DialogContent>
           <DialogTitle>More</DialogTitle>
-          <DialogDescription>Open your Recipe Inbox, account settings, or sign out.</DialogDescription>
+          <DialogDescription>Open Discover, your Recipe Inbox, account settings, or sign out.</DialogDescription>
           <nav className="mt-5 grid gap-2" aria-label="More navigation options">
+            <Link className="nav-link" href="/app/discover" onClick={() => setMobileMenuOpen(false)}><Compass size={20} /><span>Discover</span></Link>
             <Link className="nav-link" href="/app/imports" onClick={() => setMobileMenuOpen(false)}><Inbox size={20} /><span>Recipe Inbox</span></Link>
             <Link className="nav-link" href="/app/settings" onClick={() => setMobileMenuOpen(false)}><Settings size={20} /><span>Settings</span></Link>
             <button type="button" className="nav-link w-full border-0 bg-transparent text-left" disabled={isSigningOut} onClick={() => void handleSignOut()}><LogOut size={20} /><span>{isSigningOut ? "Logging out…" : "Log out"}</span></button>

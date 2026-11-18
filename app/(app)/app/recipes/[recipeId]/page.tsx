@@ -68,7 +68,7 @@ export default async function RecipePreviewPage({
             </span>
           </div>
           <div className="mt-7">
-            <RecipePreviewActions recipeId={recipe._id} isSaved={saved !== null} sourceUrl={recipe.sourceUrl} />
+            <RecipePreviewActions recipeId={recipe._id} isSaved={saved !== null} sourceUrl={recipe.sourceUrl} title={recipe.title} canEdit={data.canEdit} />
           </div>
         </div>
       </div>

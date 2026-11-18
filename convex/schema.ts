@@ -1,5 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { mealValidator, notIncludedValidator, planSlotValidator, weekStartValidator } from "./lib/plannerValidators";
+import { plannerUndoFields } from "./lib/slotHistory";
 import { recipeExtractionValidator } from "./lib/recipeAgentTypes";
 
 const importStatus = v.union(
@@ -44,6 +46,7 @@ export default defineSchema({
         v.literal("userInboxes"),
         v.literal("inboundEmails"),
         v.literal("recipeImports"),
+        v.literal("planner"),
         v.literal("groceryLists"),
       ),
     ),
@@ -278,13 +281,22 @@ export default defineSchema({
     sourceRecipeIds: v.optional(v.array(v.id("recipes"))),
     status: groceryListStatus,
     completedAt: v.optional(v.number()),
+    // Set on the one list made from a planner week (`convex/plannerGrocery.ts`):
+    // the planner, the week's first day, when it was last updated from the
+    // plan, a summary of the plan at that time and the meals left out.
+    plannerId: v.optional(v.id("planners")),
+    planWeekStart: v.optional(v.string()),
+    planSyncedAt: v.optional(v.number()),
+    planFingerprint: v.optional(v.string()),
+    planNotIncluded: v.optional(v.array(notIncludedValidator)),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_status", ["userId", "status"])
     .index("by_user_and_client_request", ["userId", "clientRequestId"])
-    .index("by_user_and_source_recipe", ["userId", "sourceRecipeId"]),
+    .index("by_user_and_source_recipe", ["userId", "sourceRecipeId"])
+    .index("by_planner_and_week_start", ["plannerId", "planWeekStart"]),
 
   // An item may combine the same ingredient from several recipes. The source
   // rows in `groceryListItemSources` retain that provenance.
@@ -300,6 +312,12 @@ export default defineSchema({
     notes: v.optional(v.string()),
     isChecked: v.boolean(),
     sortOrder: v.number(),
+    // On a planner week's list, items derived from the plan carry the
+    // grocery's match key and the amount the plan last wrote. An item without
+    // `planKey` was added by hand and an update from the plan leaves it alone.
+    planKey: v.optional(v.string()),
+    planQuantityText: v.optional(v.string()),
+    planUnit: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -315,11 +333,50 @@ export default defineSchema({
     servingsMultiplier: v.number(),
     quantityAdded: v.optional(v.number()),
     quantityTextAdded: v.optional(v.string()),
+    // Written by an update from the plan, which replaces only these rows.
+    fromPlan: v.optional(v.boolean()),
     createdAt: v.number(),
   })
     .index("by_grocery_list_item", ["groceryListItemId"])
     .index("by_recipe", ["recipeId"])
     .index("by_recipe_ingredient", ["recipeIngredientId"]),
+
+  // A weekly meal planner. Owned by one user today; slots and planner meals
+  // reference the planner rather than the user so a household can own one
+  // later. Access always goes through `canAccessPlanner`.
+  planners: defineTable({
+    ownerId: v.id("users"),
+    weekStart: weekStartValidator,
+    people: v.number(),
+    // "Meals to plan"; unset means every meal. Slots of a meal turned off are
+    // kept and hidden, so they come back when it is turned on again.
+    meals: v.optional(v.array(mealValidator)),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_owner", ["ownerId"]),
+
+  // Eat-out and other-leftovers meals. Cook slots point at recipes instead.
+  // `key` is `mealKey(name)` and is unique per planner.
+  plannerMeals: defineTable({
+    plannerId: v.id("planners"),
+    name: v.string(),
+    key: v.string(),
+    description: v.optional(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_planner_and_key", ["plannerId", "key"]),
+
+  // At most one row per planner, date and meal; an unplanned slot has none.
+  planSlots: defineTable(planSlotValidator).index("by_planner_and_date", [
+    "plannerId",
+    "date",
+    "meal",
+  ]),
+
+  // The planner's last slot change, kept so it can be undone (one level).
+  // At most one row per planner; see `convex/lib/slotHistory.ts`.
+  plannerUndo: defineTable(plannerUndoFields).index("by_planner", ["plannerId"]),
 
   recipeSearchCache: defineTable({
     normalizedQuery: v.string(),

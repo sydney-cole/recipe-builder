@@ -6,6 +6,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { GroceryListEditor } from "@/components/grocery/grocery-list-editor";
 import { Skeleton } from "@/components/ui/skeleton";
+import { amountEdited } from "@/convex/lib/planGrocery";
 import type { GroceryItem } from "@/lib/data/types";
 
 export function SavedGroceryList({ listId }: { listId: string }) {
@@ -23,6 +24,10 @@ export function SavedGroceryList({ listId }: { listId: string }) {
         unit: item.unit ?? "",
         category: item.category ?? "Other",
         source: data.itemSources?.find((source) => source.itemId === item._id)?.recipeTitles.join(", ") || undefined,
+        planAmount:
+          item.planKey !== undefined && amountEdited(item, item)
+            ? [item.planQuantityText, item.planUnit].filter(Boolean).join(" ") || undefined
+            : undefined,
         checked: item.isChecked,
       })),
     [data],
@@ -50,6 +55,7 @@ export function SavedGroceryList({ listId }: { listId: string }) {
       initialName={data.list.name}
       listId={data.list._id}
       needsInitialSave={data.list.needsInitialSave === true}
+      sourceLabel={data.list.plannerId === undefined ? "From" : "For"}
     />
   );
 }

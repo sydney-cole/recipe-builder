@@ -71,6 +71,7 @@ export default function RecipeBookPage() {
       art: recipeArt(recipe.title),
       imageUrl: recipe.imageUrl,
       isFavorite: recipe.isFavorite,
+      canEdit: recipe.canEdit,
     }));
     return filterAndSortRecipes(mapped, search, sort);
   }, [convexRecipes, search, sort, favoritesOnly, activeTag]);
@@ -147,6 +148,7 @@ export default function RecipeBookPage() {
             onSelect={selectingCurrent ? (recipeId) => void selectCurrentRecipe(recipeId) : undefined}
             isSelecting={selectingRecipeId === recipe.id}
             selectionDisabled={selectingRecipeId !== null}
+            removable={!selectingCurrent}
           />
         ))}</div>
       )}

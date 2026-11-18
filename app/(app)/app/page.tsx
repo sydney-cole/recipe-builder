@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app-shell/page-header";
+import { TodayPlan } from "@/components/planner/today-plan";
 import { RecipeCard } from "@/components/recipes/recipe-card";
-import { CurrentRecipePanel } from "@/components/recipes/current-recipe-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -76,7 +76,7 @@ export default function DashboardPage() {
         title="What are we cooking?"
         description="Your kitchen command center for saved recipes and grocery planning."
       />
-      <CurrentRecipePanel />
+      <TodayPlan />
       <section
         className="mt-8 grid gap-4 md:grid-cols-3"
         aria-label="Quick actions"
