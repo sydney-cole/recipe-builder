@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "./app-shell";
@@ -58,11 +58,14 @@ describe("AppShell", () => {
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
-  it("exposes the inbox, settings, and sign out from mobile navigation", async () => {
+  it("exposes the meal plan, inbox, settings, and sign out from mobile navigation", async () => {
     const user = userEvent.setup();
     render(<AppShell><p>Kitchen content</p></AppShell>);
 
+    expect(within(screen.getByRole("complementary", { name: "Main navigation" })).getByRole("link", { name: "Meal Plan" })).toHaveAttribute("href", "/app/meal-plan");
+    expect(within(screen.getByRole("navigation", { name: "Mobile navigation" })).queryByRole("link", { name: "Meal Plan" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "More navigation" }));
+    expect(within(screen.getByRole("navigation", { name: "More navigation options" })).getByRole("link", { name: "Meal Plan" })).toHaveAttribute("href", "/app/meal-plan");
     expect(screen.getByRole("link", { name: "Recipe Inbox" })).toHaveAttribute("href", "/app/imports");
     expect(screen.getAllByRole("link", { name: "Settings" }).at(-1)).toHaveAttribute("href", "/app/settings");
     await user.click(screen.getAllByRole("button", { name: "Log out" }).at(-1)!);

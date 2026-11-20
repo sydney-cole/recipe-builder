@@ -20,7 +20,9 @@ import { RecipeEditor } from "./recipe-editor";
 import { RecipeIngredients } from "./recipe-ingredients";
 import { CurrentRecipeButton } from "./current-recipe-button";
 
-export function RecipeDetail({ recipeId }: { recipeId: string }) {
+const RECIPE_BOOK = { href: "/app/recipe-book", label: "Back to Recipe Book" };
+
+export function RecipeDetail({ recipeId, back = RECIPE_BOOK }: { recipeId: string; back?: { href: string; label: string } }) {
   const router = useRouter();
   const data = useQuery(api.recipes.get, { recipeId });
   const setNotes = useMutation(api.recipeCards.setNotes);
@@ -104,7 +106,7 @@ export function RecipeDetail({ recipeId }: { recipeId: string }) {
 
   return (
     <div className="page-container">
-      <Button asChild variant="ghost" className="mb-5"><Link href="/app/recipe-book"><ArrowLeft size={17} />Back to Recipe Book</Link></Button>
+      <Button asChild variant="ghost" className="mb-5"><Link href={back.href}><ArrowLeft size={17} />{back.label}</Link></Button>
       {importReview?.status === "needs_review" && (
         <Card className="mb-6 border-amber-300 bg-amber-50"><CardContent><p className="font-extrabold text-amber-950">This generated recipe card needs your review</p><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900">{importReview.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul><Button className="mt-4" size="sm" onClick={() => void finishReview()}><Check size={16} />Mark review complete</Button></CardContent></Card>
       )}

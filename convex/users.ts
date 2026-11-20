@@ -127,7 +127,7 @@ export const deleteAccount = mutation({
   },
 });
 
-type DeletionStage = "auth" | "savedRecipes" | "userInboxes" | "inboundEmails" | "recipeImports" | "groceryLists";
+type DeletionStage = "auth" | "savedRecipes" | "userInboxes" | "inboundEmails" | "recipeImports" | "mealPlanEntries" | "groceryLists";
 
 export const continueAccountDeletion = internalMutation({
   args: { userId: v.id("users") },
@@ -178,7 +178,13 @@ export const continueAccountDeletion = internalMutation({
     if (user.deletionStage === "recipeImports") {
       const imports = await ctx.db.query("recipeImports").withIndex("by_requester", (q) => q.eq("requestedBy", userId)).take(50);
       await Promise.all(imports.map((item) => ctx.db.patch(item._id, { requestedBy: undefined })));
-      if (imports.length === 0) await advance("groceryLists"); else await schedule();
+      if (imports.length === 0) await advance("mealPlanEntries"); else await schedule();
+      return null;
+    }
+    if (user.deletionStage === "mealPlanEntries") {
+      const documents = await ctx.db.query("mealPlanEntries").withIndex("by_user_and_date", (q) => q.eq("userId", userId)).take(50);
+      await Promise.all(documents.map((document) => ctx.db.delete(document._id)));
+      if (documents.length === 0) await advance("groceryLists"); else await schedule();
       return null;
     }
 

@@ -663,7 +663,17 @@ describe("user settings", () => {
         createdAt: now,
         updatedAt: now,
       });
-      return { savedRecipeId, groceryListId, inboxId };
+      const mealPlanEntryId = await ctx.db.insert("mealPlanEntries", {
+        userId,
+        date: "2026-11-16",
+        slot: "dinner",
+        recipeId,
+        title: "account-recipe",
+        isLeftovers: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      return { savedRecipeId, groceryListId, inboxId, mealPlanEntryId };
     });
 
     vi.useFakeTimers();

@@ -9,6 +9,7 @@ import {
 import { groceryCategory } from "./lib/groceryCategory";
 import { parseManualIngredient } from "./lib/manualIngredient";
 import { requireUser } from "./lib/auth";
+import { mealPlanEntriesInRange, validateDateRange } from "./lib/mealPlan";
 import { canAccessRecipe } from "./lib/recipeAccess";
 import { normalizeIngredientName } from "./lib/ingredientName";
 
@@ -468,6 +469,98 @@ async function requireAccessibleRecipe(
   return recipe;
 }
 
+async function addRecipeIngredients(
+  ctx: MutationCtx,
+  list: Doc<"groceryLists">,
+  recipeId: Id<"recipes">,
+  multiplier: number,
+) {
+  const listId = list._id;
+  const [requiredIngredients, existingItems] = await Promise.all([
+    requiredRecipeIngredients(ctx, recipeId, multiplier),
+    ctx.db.query("groceryListItems").withIndex("by_list_and_order", (q) => q.eq("listId", listId)).take(MAX_LIST_ITEMS + 1),
+  ]);
+  if (existingItems.length > MAX_LIST_ITEMS) throw new Error("The grocery list is full");
+  const existingByKey = new Map(
+    existingItems.map((item) => [ingredientMatchKey(item), item]),
+  );
+  const missingKeys = new Set(
+    requiredIngredients
+      .map(ingredientMatchKey)
+      .filter((key) => !existingByKey.has(key)),
+  );
+  if (existingItems.length + missingKeys.size > MAX_LIST_ITEMS) throw new Error("The grocery list is full");
+  const now = Date.now();
+  const addition = { recipeId, multiplier, now };
+  let nextSortOrder = existingItems.reduce((maximum, item) => Math.max(maximum, item.sortOrder), 0) + 1;
+
+  for (const ingredient of requiredIngredients) {
+    const key = ingredientMatchKey(ingredient);
+    const existing = existingByKey.get(key);
+    if (existing === undefined) {
+      const itemId = await insertRecipeItem(ctx, listId, ingredient, nextSortOrder++, addition);
+      const inserted = await ctx.db.get(itemId);
+      if (inserted !== null) existingByKey.set(key, inserted);
+      continue;
+    }
+
+    const sources = await ctx.db.query("groceryListItemSources").withIndex("by_grocery_list_item", (q) => q.eq("groceryListItemId", existing._id)).take(100);
+    if (sources.some((source) => source.recipeId === recipeId)) continue;
+    const canonicalName = canonicalIngredientName(ingredient.name);
+    const targetUnit = normalizedIngredientUnit(canonicalName, existing.unit);
+    await ctx.db.patch(existing._id, {
+      ...mergedQuantity({ ...existing, unit: targetUnit }, ingredient),
+      name: canonicalName,
+      normalizedName: canonicalName,
+      unit: targetUnit,
+      notes: combinedNotes(existing.notes, ingredient.notes),
+      isChecked: false,
+      updatedAt: now,
+    });
+    await insertItemSource(ctx, existing._id, ingredient, addition);
+  }
+  await ctx.db.patch(listId, { sourceRecipeIds: sourceRecipeIdsOf([list], recipeId), updatedAt: now });
+}
+
+async function addManualItems(
+  ctx: MutationCtx,
+  listId: Id<"groceryLists">,
+  texts: string[],
+) {
+  const existingItems = await ctx.db
+    .query("groceryListItems")
+    .withIndex("by_list_and_order", (q) => q.eq("listId", listId))
+    .take(MAX_LIST_ITEMS + 1);
+  const existingByKey = new Map(existingItems.map((item) => [ingredientMatchKey(item), item]));
+  let nextSortOrder = existingItems.reduce((maximum, item) => Math.max(maximum, item.sortOrder), 0) + 1;
+  const now = Date.now();
+
+  for (const text of texts) {
+    const { name, normalizedName, quantity, quantityText, unit } =
+      normalizedGroceryItem(parseManualIngredient(text));
+    const item = { name, normalizedName, quantity, quantityText, unit };
+    const key = ingredientMatchKey(item);
+    const existing = existingByKey.get(key);
+    if (existing !== undefined) {
+      const merged = mergedQuantity(existing, item);
+      await ctx.db.patch(existing._id, { ...merged, updatedAt: now });
+      existingByKey.set(key, { ...existing, ...merged });
+      continue;
+    }
+    if (existingByKey.size >= MAX_LIST_ITEMS) throw new Error("The grocery list is full");
+    const itemId = await ctx.db.insert("groceryListItems", {
+      listId,
+      ...item,
+      isChecked: false,
+      sortOrder: nextSortOrder++,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const inserted = await ctx.db.get(itemId);
+    if (inserted !== null) existingByKey.set(key, inserted);
+  }
+}
+
 export const listMine = query({
   args: {},
   returns: v.array(groceryListValidator),
@@ -687,50 +780,61 @@ export const addRecipeToList = mutation({
     }
     await requireAccessibleRecipe(ctx, userId, recipeId);
 
-    const [requiredIngredients, existingItems] = await Promise.all([
-      requiredRecipeIngredients(ctx, recipeId, multiplier),
-      ctx.db.query("groceryListItems").withIndex("by_list_and_order", (q) => q.eq("listId", listId)).take(MAX_LIST_ITEMS + 1),
-    ]);
-    if (existingItems.length > MAX_LIST_ITEMS) throw new Error("The grocery list is full");
-    const existingByKey = new Map(
-      existingItems.map((item) => [ingredientMatchKey(item), item]),
-    );
-    const missingKeys = new Set(
-      requiredIngredients
-        .map(ingredientMatchKey)
-        .filter((key) => !existingByKey.has(key)),
-    );
-    if (existingItems.length + missingKeys.size > MAX_LIST_ITEMS) throw new Error("The grocery list is full");
-    const now = Date.now();
-    const addition = { recipeId, multiplier, now };
-    let nextSortOrder = existingItems.reduce((maximum, item) => Math.max(maximum, item.sortOrder), 0) + 1;
+    await addRecipeIngredients(ctx, list, recipeId, multiplier);
+    return listId;
+  },
+});
 
-    for (const ingredient of requiredIngredients) {
-      const key = ingredientMatchKey(ingredient);
-      const existing = existingByKey.get(key);
-      if (existing === undefined) {
-        const itemId = await insertRecipeItem(ctx, listId, ingredient, nextSortOrder++, addition);
-        const inserted = await ctx.db.get(itemId);
-        if (inserted !== null) existingByKey.set(key, inserted);
+export const createFromMealPlan = mutation({
+  args: { startDate: v.string(), endDate: v.string(), name: v.string() },
+  returns: v.id("groceryLists"),
+  handler: async (ctx, { startDate, endDate, name }) => {
+    const userId = await requireUser(ctx);
+    const listName = validListName(name);
+    validateDateRange(startDate, endDate, 7);
+
+    const entries = await mealPlanEntriesInRange(ctx, userId, startDate, endDate);
+    const multipliers = new Map<Id<"recipes">, number>();
+    const manualItems: string[] = [];
+    for (const entry of entries) {
+      if (entry.recipeId === undefined) manualItems.push(...(entry.groceryItems ?? []));
+      if (entry.recipeId === undefined || entry.isLeftovers) continue;
+      const recipe = await ctx.db.get(entry.recipeId);
+      if (
+        recipe === null ||
+        recipe.deletedAt !== undefined ||
+        !(await canAccessRecipe(ctx, userId, recipe))
+      ) {
         continue;
       }
-
-      const sources = await ctx.db.query("groceryListItemSources").withIndex("by_grocery_list_item", (q) => q.eq("groceryListItemId", existing._id)).take(100);
-      if (sources.some((source) => source.recipeId === recipeId)) continue;
-      const canonicalName = canonicalIngredientName(ingredient.name);
-      const targetUnit = normalizedIngredientUnit(canonicalName, existing.unit);
-      await ctx.db.patch(existing._id, {
-        ...mergedQuantity({ ...existing, unit: targetUnit }, ingredient),
-        name: canonicalName,
-        normalizedName: canonicalName,
-        unit: targetUnit,
-        notes: combinedNotes(existing.notes, ingredient.notes),
-        isChecked: false,
-        updatedAt: now,
-      });
-      await insertItemSource(ctx, existing._id, ingredient, addition);
+      const batches =
+        entry.servings !== undefined && recipe.servings !== undefined && recipe.servings > 0
+          ? entry.servings / recipe.servings
+          : 1;
+      const total = (multipliers.get(recipe._id) ?? 0) + batches;
+      if (total < 0.01 || total > 100) {
+        throw new Error(`The planned servings for ${recipe.title} are too far from the recipe to scale`);
+      }
+      multipliers.set(recipe._id, total);
     }
-    await ctx.db.patch(listId, { sourceRecipeIds: sourceRecipeIdsOf([list], recipeId), updatedAt: now });
+    if (multipliers.size === 0 && manualItems.length === 0) {
+      throw new Error("Nothing to buy is planned for this week");
+    }
+
+    const now = Date.now();
+    const listId = await ctx.db.insert("groceryLists", {
+      userId,
+      needsInitialSave: true,
+      name: listName,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (const [recipeId, multiplier] of multipliers) {
+      const list = await ctx.db.get(listId);
+      if (list !== null) await addRecipeIngredients(ctx, list, recipeId, multiplier);
+    }
+    await addManualItems(ctx, listId, manualItems);
     return listId;
   },
 });

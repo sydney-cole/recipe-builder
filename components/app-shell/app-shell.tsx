@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { BookOpen, Compass, Home, Inbox, ListChecks, LogOut, MoreHorizontal, Settings } from "lucide-react";
+import { BookOpen, CalendarDays, Compass, Home, Inbox, ListChecks, LogOut, MoreHorizontal, Settings } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ const primary = [
   { href: "/app/discover", label: "Discover", icon: Compass },
   { href: "/app/recipe-book", label: "Recipe Book", icon: BookOpen },
   { href: "/app/grocery-lists", label: "Grocery", icon: ListChecks },
+  { href: "/app/meal-plan", label: "Meal Plan", icon: CalendarDays },
   { href: "/app/imports", label: "Recipe Inbox", icon: Inbox },
 ];
 
@@ -86,8 +87,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <DialogContent>
           <DialogTitle>More</DialogTitle>
-          <DialogDescription>Open your Recipe Inbox, account settings, or sign out.</DialogDescription>
+          <DialogDescription>Open your Meal Plan, Recipe Inbox, account settings, or sign out.</DialogDescription>
           <nav className="mt-5 grid gap-2" aria-label="More navigation options">
+            <Link className="nav-link" href="/app/meal-plan" onClick={() => setMobileMenuOpen(false)}><CalendarDays size={20} /><span>Meal Plan</span></Link>
             <Link className="nav-link" href="/app/imports" onClick={() => setMobileMenuOpen(false)}><Inbox size={20} /><span>Recipe Inbox</span></Link>
             <Link className="nav-link" href="/app/settings" onClick={() => setMobileMenuOpen(false)}><Settings size={20} /><span>Settings</span></Link>
             <button type="button" className="nav-link w-full border-0 bg-transparent text-left" disabled={isSigningOut} onClick={() => void handleSignOut()}><LogOut size={20} /><span>{isSigningOut ? "Logging out…" : "Log out"}</span></button>
