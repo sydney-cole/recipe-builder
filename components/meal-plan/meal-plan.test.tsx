@@ -107,6 +107,7 @@ describe("WeekGrid", () => {
 
     expect(thursday.getByText("To buy: bread, jelly")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Items to buy for Chili" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Items to buy for Eating out" })).toBeNull();
 
     await user.click(thursday.getByRole("button", { name: "Items to buy for Toast" }));
     const input = thursday.getByRole("textbox", { name: "Need to buy for Toast" });

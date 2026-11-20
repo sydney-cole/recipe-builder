@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/convex/_generated/api";
-import { mealPlanErrorMessage, parseGroceryItems, plannedServings, recipeHrefFromMealPlan, type MealPlanEntry } from "@/lib/meal-plan";
+import { isQuickPick, mealPlanErrorMessage, parseGroceryItems, plannedServings, recipeHrefFromMealPlan, type MealPlanEntry } from "@/lib/meal-plan";
 import { cn } from "@/lib/utils";
 
 const MAX_SERVINGS = 100;
@@ -35,6 +35,7 @@ export function MealEntry({ entry }: { entry: MealPlanEntry }) {
   const { recipe } = entry;
   const title = recipe?.title ?? entry.title;
   const servings = plannedServings(entry);
+  const canBuyItems = !recipe && (entry.groceryItems.length > 0 || !isQuickPick(title));
 
   async function run(change: () => Promise<unknown>) {
     setIsSaving(true);
@@ -74,7 +75,7 @@ export function MealEntry({ entry }: { entry: MealPlanEntry }) {
             <p className="mt-1 break-words text-xs text-muted-foreground">To buy: {entry.groceryItems.join(", ")}</p>
           )}
         </div>
-        {!recipe && (
+        {canBuyItems && (
           <button
             type="button"
             className={cn(actionButton, entry.groceryItems.length > 0 && "text-primary")}

@@ -9,9 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { formatDay, mealPlanErrorMessage, parseGroceryItems, slotLabel, type MealSlot } from "@/lib/meal-plan";
-
-const QUICK_PICKS = ["Leftovers", "Eating out"];
+import { formatDay, mealPlanErrorMessage, parseGroceryItems, QUICK_PICKS, slotLabel, type MealSlot } from "@/lib/meal-plan";
 
 export type MealTarget = { date: string; slot: MealSlot };
 

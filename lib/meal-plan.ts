@@ -10,6 +10,12 @@ export const MEAL_SLOTS = [
   { id: "dinner", label: "Dinner" },
 ] as const;
 
+export const QUICK_PICKS = ["Leftovers", "Eating out"];
+
+export function isQuickPick(title: string) {
+  return QUICK_PICKS.some((pick) => pick.toLowerCase() === title.trim().toLowerCase());
+}
+
 export type MealSlot = (typeof MEAL_SLOTS)[number]["id"];
 
 const WEEK_STARTS_ON = 0;
