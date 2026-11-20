@@ -44,6 +44,7 @@ export default defineSchema({
         v.literal("userInboxes"),
         v.literal("inboundEmails"),
         v.literal("recipeImports"),
+        v.literal("mealPlanEntries"),
         v.literal("groceryLists"),
       ),
     ),
@@ -276,12 +277,14 @@ export default defineSchema({
     sourceRecipeId: v.optional(v.id("recipes")),
     sourceRecipeTitle: v.optional(v.string()),
     sourceRecipeIds: v.optional(v.array(v.id("recipes"))),
+    mealPlanStartDate: v.optional(v.string()),
     status: groceryListStatus,
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_and_meal_plan_start", ["userId", "mealPlanStartDate"])
     .index("by_user_and_status", ["userId", "status"])
     .index("by_user_and_client_request", ["userId", "clientRequestId"])
     .index("by_user_and_source_recipe", ["userId", "sourceRecipeId"]),
@@ -320,6 +323,27 @@ export default defineSchema({
     .index("by_grocery_list_item", ["groceryListItemId"])
     .index("by_recipe", ["recipeId"])
     .index("by_recipe_ingredient", ["recipeIngredientId"]),
+
+  // One planned meal. `date` is the user's local calendar day as YYYY-MM-DD.
+  // `title` is free text, or a snapshot of the linked recipe's title so the
+  // entry stays readable after that recipe is deleted. `groceryItems` are
+  // things to buy for a meal that has no recipe.
+  mealPlanEntries: defineTable({
+    userId: v.id("users"),
+    date: v.string(),
+    slot: v.union(
+      v.literal("breakfast"),
+      v.literal("lunch"),
+      v.literal("dinner"),
+    ),
+    recipeId: v.optional(v.id("recipes")),
+    title: v.string(),
+    isLeftovers: v.boolean(),
+    servings: v.optional(v.number()),
+    groceryItems: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user_and_date", ["userId", "date"]),
 
   recipeSearchCache: defineTable({
     normalizedQuery: v.string(),

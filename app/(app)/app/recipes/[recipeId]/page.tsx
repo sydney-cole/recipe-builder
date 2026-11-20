@@ -10,16 +10,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { api } from "@/convex/_generated/api";
 import { convexAuthNextjsAccessToken } from "@/lib/convex-auth";
+import { mealPlanBackLink } from "@/lib/meal-plan";
 import { recipeArt } from "@/lib/data/recipe-view";
 
 export const metadata: Metadata = { title: "Recipe preview" };
 
 export default async function RecipePreviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ recipeId: string }>;
+  searchParams: Promise<{ mealPlanWeek?: string | string[] }>;
 }) {
   const { recipeId } = await params;
+  const back = mealPlanBackLink((await searchParams).mealPlanWeek) ?? { href: "/app", label: "Return home" };
   const token = await convexAuthNextjsAccessToken();
   const data = await fetchQuery(api.recipes.get, { recipeId }, { token: token ?? undefined });
   if (data === null) notFound();
@@ -34,9 +38,9 @@ export default async function RecipePreviewPage({
   return (
     <div className="page-container">
       <Button asChild variant="ghost" className="mb-5">
-        <Link href="/app">
+        <Link href={back.href}>
           <ArrowLeft size={17} />
-          Return home
+          {back.label}
         </Link>
       </Button>
       <div className="recipe-detail-hero">

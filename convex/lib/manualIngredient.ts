@@ -6,6 +6,7 @@ const unicodeFractions: Record<string, string> = {
 const units: Record<string, string> = {
   cup: "cup", cups: "cup",
   tablespoon: "tbsp", tablespoons: "tbsp", tbsp: "tbsp", tbsps: "tbsp",
+  tblsp: "tbsp", tblsps: "tbsp", tbs: "tbsp", tbl: "tbsp",
   teaspoon: "tsp", teaspoons: "tsp", tsp: "tsp", tsps: "tsp",
   pound: "lb", pounds: "lb", lb: "lb", lbs: "lb",
   ounce: "oz", ounces: "oz", oz: "oz",
@@ -17,6 +18,8 @@ const units: Record<string, string> = {
   can: "can", cans: "can", package: "package", packages: "package",
   stick: "stick", sticks: "stick", bunch: "bunch", bunches: "bunch",
   slice: "slice", slices: "slice", piece: "piece", pieces: "piece",
+  loaf: "loaf", loaves: "loaf", jar: "jar", jars: "jar", bag: "bag", bags: "bag",
+  bottle: "bottle", bottles: "bottle", box: "box", boxes: "box",
 };
 
 function numericQuantity(value: string) {
@@ -44,6 +47,22 @@ export function parseManualIngredient(value: string): ParsedManualIngredient {
   const expanded = originalText.replace(/(\d)([¼½¾⅓⅔⅛⅜⅝⅞])/g, "$1 $2").replace(/[¼½¾⅓⅔⅛⅜⅝⅞]/g, (fraction) => unicodeFractions[fraction]);
   const match = expanded.match(/^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?|\d+\/\d+)\s+(.+)$/);
   if (!match) {
+    // Some sites write the amount last: "Garlic powder - 2 tblsp".
+    const trailing = expanded.match(/^(\D+?)\s*[-–—:]\s*(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?|\d+\/\d+)(?:\s+(.+))?$/);
+    if (trailing) {
+      const [unitCandidate = "", ...rest] = (trailing[3] ?? "").trim().split(/\s+/);
+      const unit = units[unitCandidate.toLowerCase().replace(/[.,]$/, "")];
+      const name = trailing[1].trim().toLowerCase().replace(/\s+/g, " ");
+      return {
+        originalText,
+        name,
+        normalizedName: name,
+        quantity: numericQuantity(trailing[2]),
+        quantityText: trailing[2],
+        unit,
+        preparation: (unit ? rest.join(" ") : trailing[3]?.trim()) || undefined,
+      };
+    }
     const name = originalText.toLowerCase().replace(/\s+/g, " ");
     return { originalText, name, normalizedName: name };
   }
