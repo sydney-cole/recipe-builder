@@ -277,12 +277,14 @@ export default defineSchema({
     sourceRecipeId: v.optional(v.id("recipes")),
     sourceRecipeTitle: v.optional(v.string()),
     sourceRecipeIds: v.optional(v.array(v.id("recipes"))),
+    mealPlanStartDate: v.optional(v.string()),
     status: groceryListStatus,
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_and_meal_plan_start", ["userId", "mealPlanStartDate"])
     .index("by_user_and_status", ["userId", "status"])
     .index("by_user_and_client_request", ["userId", "clientRequestId"])
     .index("by_user_and_source_recipe", ["userId", "sourceRecipeId"]),

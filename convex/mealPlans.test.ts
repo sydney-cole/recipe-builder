@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -134,6 +135,40 @@ describe("meal plan entries", () => {
     await expect(ada.as.mutation(api.mealPlans.add, { date: "2026-11-17", slot: "dinner", recipeId })).rejects.toThrow(/not found/);
     await expect(ada.as.mutation(api.groceryLists.createFromMealPlan, { ...week, name: "Week" })).rejects.toThrow(/Nothing to buy is planned/);
   });
+
+  it("turns a meal whose recipe is gone into a plain meal when items to buy are saved", async () => {
+    const t = initAuthTest();
+    const ada = await signedInUser(t, "ada@example.com");
+    const recipeId = await createRecipe(t, ada.userId, "Chili", { servings: 4 });
+    const entryId = await ada.as.mutation(api.mealPlans.add, { date: "2026-11-16", slot: "dinner", recipeId, isLeftovers: true });
+    await ada.as.mutation(api.mealPlans.setServings, { entryId, servings: 6 });
+    await t.run(async (ctx) => ctx.db.patch(recipeId, { deletedAt: Date.now() }));
+
+    await ada.as.mutation(api.mealPlans.setGroceryItems, { entryId, groceryItems: ["beans"] });
+
+    expect(await ada.as.query(api.mealPlans.listRange, week)).toMatchObject([
+      { title: "Chili", recipe: null, isLeftovers: false, groceryItems: ["beans"] },
+    ]);
+    expect(await t.run(async (ctx) => ctx.db.get(entryId))).not.toHaveProperty("recipeId");
+    const listId = await ada.as.mutation(api.groceryLists.createFromMealPlan, { ...week, name: "Week" });
+    expect(await listItems(t, listId)).toEqual([{ name: "beans", quantity: undefined }]);
+  });
+
+  it("reports limits the user can act on as readable errors", async () => {
+    const t = initAuthTest();
+    const ada = await signedInUser(t, "ada@example.com");
+    const add = (title: string) => ada.as.mutation(api.mealPlans.add, { date: "2026-11-16", slot: "dinner", title });
+    for (let count = 0; count < 10; count++) await add(`Meal ${count}`);
+
+    const slotFull = await add("One too many").catch((error: unknown) => error);
+    expect(slotFull).toBeInstanceOf(ConvexError);
+    expect((slotFull as ConvexError<string>).data).toBe("A meal can hold at most 10 entries");
+
+    const nothingPlanned = await ada.as
+      .mutation(api.groceryLists.createFromMealPlan, { ...week, name: "Week" })
+      .catch((error: unknown) => error);
+    expect((nothingPlanned as ConvexError<string>).data).toBe("Nothing to buy is planned for this week");
+  });
 });
 
 describe("grocery list from a meal plan", () => {
@@ -216,6 +251,52 @@ describe("grocery list from a meal plan", () => {
     await setItems(toast, ["bread"]);
     const listId = await ada.as.mutation(api.groceryLists.createFromMealPlan, { ...week, name: "Week" });
     expect(await listItems(t, listId)).toEqual([{ name: "bread", quantity: undefined }]);
+  });
+
+  it("keeps one list per week, reusing it unless asked to replace it", async () => {
+    const t = initAuthTest();
+    const ada = await signedInUser(t, "ada@example.com");
+    const grace = await signedInUser(t, "grace@example.com");
+    const create = (options: { replaceExisting?: boolean; range?: typeof week } = {}) =>
+      ada.as.mutation(api.groceryLists.createFromMealPlan, { ...(options.range ?? week), name: "Week", replaceExisting: options.replaceExisting });
+    const toast = await ada.as.mutation(api.mealPlans.add, { date: "2026-11-17", slot: "breakfast", title: "Toast", groceryItems: ["bread"] });
+    await ada.as.mutation(api.mealPlans.add, { date: "2026-11-23", slot: "breakfast", title: "Oats", groceryItems: ["oats"] });
+
+    expect(await ada.as.query(api.groceryLists.forMealPlan, { startDate: week.startDate })).toBeNull();
+    const listId = await create();
+    expect(await ada.as.query(api.groceryLists.forMealPlan, { startDate: week.startDate })).toBe(listId);
+    expect(await grace.as.query(api.groceryLists.forMealPlan, { startDate: week.startDate })).toBeNull();
+    await expect(t.query(api.groceryLists.forMealPlan, { startDate: week.startDate })).rejects.toThrow(/Unauthenticated/);
+
+    await ada.as.mutation(api.mealPlans.setGroceryItems, { entryId: toast, groceryItems: ["bread", "jelly"] });
+    expect(await create()).toBe(listId);
+    expect(await listItems(t, listId)).toEqual([{ name: "bread", quantity: undefined }]);
+
+    const nextWeekListId = await create({ range: { startDate: "2026-11-22", endDate: "2026-11-28" } });
+    expect(nextWeekListId).not.toBe(listId);
+
+    const replacementId = await create({ replaceExisting: true });
+    expect(replacementId).not.toBe(listId);
+    expect(await listItems(t, replacementId)).toEqual([
+      { name: "bread", quantity: undefined },
+      { name: "jelly", quantity: undefined },
+    ]);
+    expect(await t.run(async (ctx) => ctx.db.get(listId))).toBeNull();
+    expect(await listItems(t, listId)).toEqual([]);
+    expect(await listItems(t, nextWeekListId)).toEqual([{ name: "oats", quantity: undefined }]);
+    expect(await ada.as.query(api.groceryLists.forMealPlan, { startDate: week.startDate })).toBe(replacementId);
+
+    await ada.as.mutation(api.groceryLists.removeList, { listId: replacementId });
+    expect(await ada.as.query(api.groceryLists.forMealPlan, { startDate: week.startDate })).toBeNull();
+
+    await ada.as.mutation(api.mealPlans.remove, { entryId: toast });
+    const keptId = await create({ range: { startDate: "2026-11-22", endDate: "2026-11-28" }, replaceExisting: true });
+    await ada.as.mutation(api.mealPlans.setGroceryItems, {
+      entryId: (await ada.as.query(api.mealPlans.listRange, { startDate: "2026-11-22", endDate: "2026-11-28" }))[0]._id,
+      groceryItems: [],
+    });
+    await expect(create({ range: { startDate: "2026-11-22", endDate: "2026-11-28" }, replaceExisting: true })).rejects.toThrow(/Nothing to buy is planned/);
+    expect(await listItems(t, keptId)).toEqual([{ name: "oats", quantity: undefined }]);
   });
 
   it("rejects weeks with nothing to cook, long ranges and extreme servings", async () => {

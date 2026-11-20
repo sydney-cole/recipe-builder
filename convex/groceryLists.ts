@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   mutation,
@@ -40,6 +40,7 @@ const groceryListValidator = v.object({
   sourceRecipeId: v.optional(v.id("recipes")),
   sourceRecipeTitle: v.optional(v.string()),
   sourceRecipeIds: v.optional(v.array(v.id("recipes"))),
+  mealPlanStartDate: v.optional(v.string()),
   status: groceryListStatus,
   completedAt: v.optional(v.number()),
   createdAt: v.number(),
@@ -469,6 +470,16 @@ async function requireAccessibleRecipe(
   return recipe;
 }
 
+async function mealPlanList(ctx: QueryCtx, userId: Id<"users">, startDate: string) {
+  return await ctx.db
+    .query("groceryLists")
+    .withIndex("by_user_and_meal_plan_start", (q) =>
+      q.eq("userId", userId).eq("mealPlanStartDate", startDate),
+    )
+    .order("desc")
+    .first();
+}
+
 async function addRecipeIngredients(
   ctx: MutationCtx,
   list: Doc<"groceryLists">,
@@ -480,7 +491,7 @@ async function addRecipeIngredients(
     requiredRecipeIngredients(ctx, recipeId, multiplier),
     ctx.db.query("groceryListItems").withIndex("by_list_and_order", (q) => q.eq("listId", listId)).take(MAX_LIST_ITEMS + 1),
   ]);
-  if (existingItems.length > MAX_LIST_ITEMS) throw new Error("The grocery list is full");
+  if (existingItems.length > MAX_LIST_ITEMS) throw new ConvexError("The grocery list is full");
   const existingByKey = new Map(
     existingItems.map((item) => [ingredientMatchKey(item), item]),
   );
@@ -489,7 +500,7 @@ async function addRecipeIngredients(
       .map(ingredientMatchKey)
       .filter((key) => !existingByKey.has(key)),
   );
-  if (existingItems.length + missingKeys.size > MAX_LIST_ITEMS) throw new Error("The grocery list is full");
+  if (existingItems.length + missingKeys.size > MAX_LIST_ITEMS) throw new ConvexError("The grocery list is full");
   const now = Date.now();
   const addition = { recipeId, multiplier, now };
   let nextSortOrder = existingItems.reduce((maximum, item) => Math.max(maximum, item.sortOrder), 0) + 1;
@@ -547,7 +558,7 @@ async function addManualItems(
       existingByKey.set(key, { ...existing, ...merged });
       continue;
     }
-    if (existingByKey.size >= MAX_LIST_ITEMS) throw new Error("The grocery list is full");
+    if (existingByKey.size >= MAX_LIST_ITEMS) throw new ConvexError("The grocery list is full");
     const itemId = await ctx.db.insert("groceryListItems", {
       listId,
       ...item,
@@ -785,13 +796,30 @@ export const addRecipeToList = mutation({
   },
 });
 
+export const forMealPlan = query({
+  args: { startDate: v.string() },
+  returns: v.union(v.null(), v.id("groceryLists")),
+  handler: async (ctx, { startDate }) => {
+    const userId = await requireUser(ctx);
+    return (await mealPlanList(ctx, userId, startDate))?._id ?? null;
+  },
+});
+
 export const createFromMealPlan = mutation({
-  args: { startDate: v.string(), endDate: v.string(), name: v.string() },
+  args: {
+    startDate: v.string(),
+    endDate: v.string(),
+    name: v.string(),
+    replaceExisting: v.optional(v.boolean()),
+  },
   returns: v.id("groceryLists"),
-  handler: async (ctx, { startDate, endDate, name }) => {
+  handler: async (ctx, { startDate, endDate, name, replaceExisting }) => {
     const userId = await requireUser(ctx);
     const listName = validListName(name);
     validateDateRange(startDate, endDate, 7);
+
+    const existing = await mealPlanList(ctx, userId, startDate);
+    if (existing !== null && !replaceExisting) return existing._id;
 
     const entries = await mealPlanEntriesInRange(ctx, userId, startDate, endDate);
     const multipliers = new Map<Id<"recipes">, number>();
@@ -813,19 +841,27 @@ export const createFromMealPlan = mutation({
           : 1;
       const total = (multipliers.get(recipe._id) ?? 0) + batches;
       if (total < 0.01 || total > 100) {
-        throw new Error(`The planned servings for ${recipe.title} are too far from the recipe to scale`);
+        throw new ConvexError(`The planned servings for ${recipe.title} are too far from the recipe to scale`);
       }
       multipliers.set(recipe._id, total);
     }
     if (multipliers.size === 0 && manualItems.length === 0) {
-      throw new Error("Nothing to buy is planned for this week");
+      throw new ConvexError("Nothing to buy is planned for this week");
     }
 
     const now = Date.now();
+    if (existing !== null) {
+      const items = await ctx.db
+        .query("groceryListItems")
+        .withIndex("by_list", (q) => q.eq("listId", existing._id))
+        .take(MAX_LIST_ITEMS);
+      await deleteListWithItems(ctx, existing, items, now);
+    }
     const listId = await ctx.db.insert("groceryLists", {
       userId,
       needsInitialSave: true,
       name: listName,
+      mealPlanStartDate: startDate,
       status: "active",
       createdAt: now,
       updatedAt: now,

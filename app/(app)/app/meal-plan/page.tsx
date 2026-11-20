@@ -2,6 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { ChevronLeft, ChevronRight, ShoppingBasket } from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { PageHeader } from "@/components/app-shell/page-header";
@@ -26,13 +27,22 @@ export default function MealPlanPage() {
 
   const thisWeek = today === null ? null : startOfWeek(today);
   const weekStart = selectedWeek ?? thisWeek;
+  const showWeek = (week: string | null) => {
+    setSelectedWeek(week);
+    // Keeps the week across a refresh without a navigation round trip.
+    window.history.replaceState(null, "", week === null ? window.location.pathname : `?week=${week}`);
+  };
   const moveWeeks = (weeks: number) => {
-    if (weekStart !== null) setSelectedWeek(addDays(weekStart, weeks * 7));
+    if (weekStart !== null) showWeek(addDays(weekStart, weeks * 7));
   };
   const entries = useQuery(
     api.mealPlans.listRange,
     weekStart === null ? "skip" : { startDate: weekStart, endDate: addDays(weekStart, 6) },
   );
+  const groceryListId = useQuery(
+    api.groceryLists.forMealPlan,
+    weekStart === null ? "skip" : { startDate: weekStart },
+  ) ?? null;
   const hasGroceries = (entries ?? []).some((entry) =>
     entry.recipe === null ? entry.groceryItems.length > 0 : !entry.isLeftovers,
   );
@@ -44,15 +54,22 @@ export default function MealPlanPage() {
         title="Meal Plan"
         description="Plan breakfast, lunch, and dinner, then turn the week into a grocery list."
         actions={
-          <Button disabled={!hasGroceries} onClick={() => setReviewOpen(true)}>
-            <ShoppingBasket size={17} />Create grocery list
-          </Button>
+          groceryListId === null ? (
+            <Button disabled={!hasGroceries} onClick={() => setReviewOpen(true)}>
+              <ShoppingBasket size={17} />Create grocery list
+            </Button>
+          ) : (
+            <div className="cluster">
+              <Button asChild><Link href={`/app/grocery-lists/${groceryListId}`}><ShoppingBasket size={17} />Open grocery list</Link></Button>
+              <Button variant="secondary" disabled={!hasGroceries} onClick={() => setReviewOpen(true)}>Rebuild from plan</Button>
+            </div>
+          )
         }
       />
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <Button variant="secondary" size="icon" aria-label="Previous week" onClick={() => moveWeeks(-1)}><ChevronLeft size={18} /></Button>
         <Button variant="secondary" size="icon" aria-label="Next week" onClick={() => moveWeeks(1)}><ChevronRight size={18} /></Button>
-        <Button variant="secondary" disabled={weekStart === thisWeek} onClick={() => setSelectedWeek(null)}>This week</Button>
+        <Button variant="secondary" disabled={weekStart === thisWeek} onClick={() => showWeek(null)}>This week</Button>
         <p className="ml-1 font-extrabold" role="status">{weekStart === null ? "Loading week…" : formatWeekRange(weekStart)}</p>
       </div>
       {today === null || weekStart === null || entries === undefined ? (
@@ -62,7 +79,7 @@ export default function MealPlanPage() {
       ) : (
         <>
           <WeekGrid days={weekDays(weekStart)} today={today} entries={entries} onAdd={(date, slot) => setAddingTo({ date, slot })} />
-          <GroceryReviewDialog open={reviewOpen} onOpenChange={setReviewOpen} weekStart={weekStart} entries={entries} />
+          <GroceryReviewDialog open={reviewOpen} onOpenChange={setReviewOpen} weekStart={weekStart} entries={entries} existingListId={groceryListId} />
         </>
       )}
       <AddMealDialog target={addingTo} onClose={() => setAddingTo(null)} />

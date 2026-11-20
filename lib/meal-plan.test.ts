@@ -1,5 +1,6 @@
+import { ConvexError } from "convex/values";
 import { describe, expect, it } from "vitest";
-import { addDays, formatWeekRange, mealPlanBackLink, startOfWeek, toDateKey, weekDays } from "./meal-plan";
+import { addDays, formatWeekRange, mealPlanBackLink, mealPlanErrorMessage, startOfWeek, toDateKey, weekDays } from "./meal-plan";
 
 describe("meal plan dates", () => {
   it("formats a local date without shifting the day", () => {
@@ -36,5 +37,11 @@ describe("meal plan dates", () => {
     expect(mealPlanBackLink(undefined)).toBeUndefined();
     expect(mealPlanBackLink("//evil.example")).toBeUndefined();
     expect(mealPlanBackLink(["2026-11-18", "2026-11-19"])).toBeUndefined();
+  });
+
+  it("shows the server's explanation for a failure, or the fallback when there is none", () => {
+    expect(mealPlanErrorMessage(new ConvexError("The grocery list is full"), "Try again.")).toBe("The grocery list is full");
+    expect(mealPlanErrorMessage(new ConvexError({ code: "other" }), "Try again.")).toBe("Try again.");
+    expect(mealPlanErrorMessage(new Error("Server Error"), "Try again.")).toBe("Try again.");
   });
 });

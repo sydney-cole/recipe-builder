@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { formatDay, parseGroceryItems, slotLabel, type MealSlot } from "@/lib/meal-plan";
+import { formatDay, mealPlanErrorMessage, parseGroceryItems, slotLabel, type MealSlot } from "@/lib/meal-plan";
 
 const QUICK_PICKS = ["Leftovers", "Eating out"];
 
@@ -23,7 +23,7 @@ export function AddMealDialog({ target, onClose }: { target: MealTarget | null; 
   const [search, setSearch] = useState("");
   const [isLeftovers, setIsLeftovers] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const query = search.trim().toLowerCase();
   const matches = (recipes ?? []).filter((recipe) => recipe.title.toLowerCase().includes(query));
@@ -33,20 +33,20 @@ export function AddMealDialog({ target, onClose }: { target: MealTarget | null; 
     setToBuy("");
     setSearch("");
     setIsLeftovers(false);
-    setError(false);
+    setError(null);
     onClose();
   }
 
   async function addMeal(meal: { title: string; groceryItems?: string[] } | { recipeId: Id<"recipes">; isLeftovers: boolean }) {
     if (target === null) return;
     setIsAdding(true);
-    setError(false);
+    setError(null);
     try {
       await add({ ...target, ...meal });
       setIsAdding(false);
       close();
-    } catch {
-      setError(true);
+    } catch (failure) {
+      setError(mealPlanErrorMessage(failure, "Couldn't add this meal. Try again."));
       setIsAdding(false);
     }
   }
@@ -126,7 +126,7 @@ export function AddMealDialog({ target, onClose }: { target: MealTarget | null; 
             </>
           )}
         </div>
-        {error && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" role="alert">Couldn&apos;t add this meal. Try again.</p>}
+        {error !== null && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" role="alert">{error}</p>}
       </DialogContent>
     </Dialog>
   );

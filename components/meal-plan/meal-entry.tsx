@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/convex/_generated/api";
-import { parseGroceryItems, plannedServings, recipeHrefFromMealPlan, type MealPlanEntry } from "@/lib/meal-plan";
+import { mealPlanErrorMessage, parseGroceryItems, plannedServings, recipeHrefFromMealPlan, type MealPlanEntry } from "@/lib/meal-plan";
 import { cn } from "@/lib/utils";
 
 const MAX_SERVINGS = 100;
@@ -31,18 +31,18 @@ export function MealEntry({ entry }: { entry: MealPlanEntry }) {
   const setGroceryItems = useMutation(api.mealPlans.setGroceryItems);
   const [toBuy, setToBuy] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { recipe } = entry;
   const title = recipe?.title ?? entry.title;
   const servings = plannedServings(entry);
 
   async function run(change: () => Promise<unknown>) {
     setIsSaving(true);
-    setError(false);
+    setError(null);
     try {
       await change();
-    } catch {
-      setError(true);
+    } catch (failure) {
+      setError(mealPlanErrorMessage(failure, "Couldn't update this meal. Try again."));
     } finally {
       setIsSaving(false);
     }
@@ -127,7 +127,7 @@ export function MealEntry({ entry }: { entry: MealPlanEntry }) {
           <button type="submit" className="button button-secondary button-sm" disabled={isSaving}>Save items</button>
         </form>
       )}
-      {error && <p className="mt-1 text-xs font-semibold text-red-700" role="alert">Couldn&apos;t update this meal. Try again.</p>}
+      {error !== null && <p className="mt-1 text-xs font-semibold text-red-700" role="alert">{error}</p>}
     </li>
   );
 }

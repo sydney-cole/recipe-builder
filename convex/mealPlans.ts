@@ -1,6 +1,6 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { requireUser } from "./lib/auth";
 import {
   mealPlanEntriesInRange,
@@ -43,12 +43,22 @@ const MAX_GROCERY_ITEM_LENGTH = 100;
 function validGroceryItems(items: string[]) {
   const names = items.map((item) => item.trim().replace(/\s+/g, " ")).filter((item) => item.length > 0);
   if (names.length > MAX_GROCERY_ITEMS) {
-    throw new Error(`A meal can list at most ${MAX_GROCERY_ITEMS} items to buy`);
+    throw new ConvexError(`A meal can list at most ${MAX_GROCERY_ITEMS} items to buy`);
   }
   if (names.some((name) => name.length > MAX_GROCERY_ITEM_LENGTH)) {
-    throw new Error(`Items to buy must be at most ${MAX_GROCERY_ITEM_LENGTH} characters`);
+    throw new ConvexError(`Items to buy must be at most ${MAX_GROCERY_ITEM_LENGTH} characters each`);
   }
   return names.length === 0 ? undefined : names;
+}
+
+async function visibleRecipe(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  recipeId: Id<"recipes"> | undefined,
+) {
+  const recipe = recipeId === undefined ? null : await ctx.db.get(recipeId);
+  if (recipe === null || recipe.deletedAt !== undefined) return null;
+  return (await canAccessRecipe(ctx, userId, recipe)) ? recipe : null;
 }
 
 async function requireOwnedEntry(
@@ -83,13 +93,8 @@ export const listRange = query({
     const entries = await mealPlanEntriesInRange(ctx, userId, startDate, endDate);
     return await Promise.all(
       entries.map(async (entry) => {
-        const recipe =
-          entry.recipeId === undefined ? null : await ctx.db.get(entry.recipeId);
-        const visible =
-          recipe !== null &&
-          recipe.deletedAt === undefined &&
-          (await canAccessRecipe(ctx, userId, recipe));
-        const saved = visible
+        const recipe = await visibleRecipe(ctx, userId, entry.recipeId);
+        const saved = recipe !== null
           ? await ctx.db
               .query("savedRecipes")
               .withIndex("by_user_and_recipe", (q) =>
@@ -105,7 +110,7 @@ export const listRange = query({
           isLeftovers: entry.isLeftovers,
           servings: entry.servings,
           groceryItems: entry.groceryItems ?? [],
-          recipe: visible
+          recipe: recipe !== null
             ? {
                 id: recipe._id,
                 title: recipe.title,
@@ -150,7 +155,7 @@ export const add = mutation({
       .withIndex("by_user_and_date", (q) => q.eq("userId", userId).eq("date", date))
       .take(MAX_SLOT_ENTRIES * 3);
     if (sameDay.filter((entry) => entry.slot === slot).length >= MAX_SLOT_ENTRIES) {
-      throw new Error(`A meal can hold at most ${MAX_SLOT_ENTRIES} entries`);
+      throw new ConvexError(`A meal can hold at most ${MAX_SLOT_ENTRIES} entries`);
     }
 
     const now = Date.now();
@@ -199,10 +204,15 @@ export const setGroceryItems = mutation({
   handler: async (ctx, { entryId, groceryItems }) => {
     const userId = await requireUser(ctx);
     const entry = await requireOwnedEntry(ctx, userId, entryId);
-    if (entry.recipeId !== undefined) {
+    if ((await visibleRecipe(ctx, userId, entry.recipeId)) !== null) {
       throw new Error("Meals linked to a recipe get their groceries from the recipe");
     }
+    // An entry whose recipe is gone already reads as a plain meal, so saving
+    // items for it makes that permanent.
     await ctx.db.patch(entryId, {
+      recipeId: undefined,
+      servings: undefined,
+      isLeftovers: false,
       groceryItems: validGroceryItems(groceryItems),
       updatedAt: Date.now(),
     });

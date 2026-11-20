@@ -6,16 +6,18 @@ import MealPlanPage from "./page";
 const mocks = vi.hoisted(() => ({
   entries: undefined as unknown,
   ranges: [] as unknown[],
+  listId: null as string | null,
   search: "",
 }));
 
 vi.mock("convex/react", () => ({
   useQuery: (_query: unknown, args: unknown) => {
-    if (args !== "skip" && args !== undefined && "startDate" in (args as object)) {
+    if (args === "skip" || args === undefined) return undefined;
+    if ("endDate" in (args as object)) {
       mocks.ranges.push(args);
       return mocks.entries;
     }
-    return [];
+    return "startDate" in (args as object) ? mocks.listId : [];
   },
   useMutation: () => vi.fn(),
 }));
@@ -31,7 +33,9 @@ describe("MealPlanPage", () => {
     vi.setSystemTime(new Date(2026, 10, 20, 12));
     mocks.entries = [];
     mocks.ranges = [];
+    mocks.listId = null;
     mocks.search = "";
+    window.history.replaceState(null, "", "/app/meal-plan");
   });
 
   afterEach(() => {
@@ -50,10 +54,13 @@ describe("MealPlanPage", () => {
     await user.click(screen.getByRole("button", { name: "Next week" }));
     expect(screen.getByRole("status")).toHaveTextContent("Nov 22 – Nov 28");
     expect(mocks.ranges.at(-1)).toEqual({ startDate: "2026-11-22", endDate: "2026-11-28" });
+    expect(window.location.search).toBe("?week=2026-11-22");
 
     await user.click(screen.getByRole("button", { name: "This week" }));
+    expect(window.location.pathname + window.location.search).toBe("/app/meal-plan");
     await user.click(screen.getByRole("button", { name: "Previous week" }));
     expect(screen.getByRole("status")).toHaveTextContent("Nov 8 – Nov 14");
+    expect(window.location.search).toBe("?week=2026-11-08");
   });
 
   it("opens on the week named in the link, falling back to this week", async () => {
@@ -99,5 +106,17 @@ describe("MealPlanPage", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     await user.click(screen.getByRole("button", { name: "Add lunch for Monday, Nov 16" }));
     expect(screen.getByRole("dialog", { name: "Add lunch" })).toBeInTheDocument();
+  });
+
+  it("opens the list already made for the week, or rebuilds it from the plan", async () => {
+    const user = userEvent.setup();
+    mocks.listId = "list-1";
+    mocks.entries = [{ _id: "d", date: "2026-11-19", slot: "breakfast", title: "Toast", isLeftovers: false, groceryItems: ["bread"], recipe: null }];
+    render(<MealPlanPage />);
+
+    expect(screen.queryByRole("button", { name: "Create grocery list" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Open grocery list" })).toHaveAttribute("href", "/app/grocery-lists/list-1");
+    await user.click(screen.getByRole("button", { name: "Rebuild from plan" }));
+    expect(screen.getByRole("button", { name: "Replace grocery list" })).toBeInTheDocument();
   });
 });

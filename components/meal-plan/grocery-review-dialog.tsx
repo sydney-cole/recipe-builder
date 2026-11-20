@@ -2,16 +2,19 @@
 
 import { useMutation } from "convex/react";
 import { Minus, Plus, ShoppingBasket } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import {
   addDays,
   formatDay,
   formatWeekRange,
   MEAL_SLOTS,
+  mealPlanErrorMessage,
   plannedServings,
   slotLabel,
   type MealPlanEntry,
@@ -28,11 +31,12 @@ function when(entry: MealPlanEntry) {
   return `${formatDay(entry.date, { weekday: "short" })} ${slotLabel(entry.slot).toLowerCase()}`;
 }
 
-export function GroceryReviewDialog({ open, onOpenChange, weekStart, entries }: {
+export function GroceryReviewDialog({ open, onOpenChange, weekStart, entries, existingListId = null }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   weekStart: string;
   entries: MealPlanEntry[];
+  existingListId?: Id<"groceryLists"> | null;
 }) {
   const setServings = useMutation(api.mealPlans.setServings);
   const createFromMealPlan = useMutation(api.groceryLists.createFromMealPlan);
@@ -51,8 +55,8 @@ export function GroceryReviewDialog({ open, onOpenChange, weekStart, entries }: 
     setError(null);
     try {
       await setServings({ entryId: entry._id, servings });
-    } catch {
-      setError("Couldn't change the servings. Try again.");
+    } catch (failure) {
+      setError(mealPlanErrorMessage(failure, "Couldn't change the servings. Try again."));
     }
   }
 
@@ -64,12 +68,13 @@ export function GroceryReviewDialog({ open, onOpenChange, weekStart, entries }: 
         startDate: weekStart,
         endDate: addDays(weekStart, 6),
         name: `Meal plan: ${formatWeekRange(weekStart)}`,
+        replaceExisting: existingListId !== null,
       });
       setIsCreating(false);
       onOpenChange(false);
       router.push(`/app/grocery-lists/${listId}`);
-    } catch {
-      setError("Couldn't create the grocery list. Try again.");
+    } catch (failure) {
+      setError(mealPlanErrorMessage(failure, "Couldn't create the grocery list. Try again."));
       setIsCreating(false);
     }
   }
@@ -118,10 +123,15 @@ export function GroceryReviewDialog({ open, onOpenChange, weekStart, entries }: 
             </ul>
           </div>
         )}
+        {existingListId !== null && (
+          <p className="mt-5 rounded-lg bg-surface-subtle p-3 text-sm">
+            You already have a <Link className="font-bold text-primary underline" href={`/app/grocery-lists/${existingListId}`}>grocery list for this week</Link>. Replacing it rebuilds the list from this plan and discards any changes you made to it.
+          </p>
+        )}
         {error !== null && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-700" role="alert">{error}</p>}
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" disabled={isCreating} onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button disabled={isCreating || (cooking.length === 0 && extras.length === 0)} onClick={() => void create()}><ShoppingBasket size={16} />{isCreating ? "Creating…" : "Create grocery list"}</Button>
+          <Button disabled={isCreating || (cooking.length === 0 && extras.length === 0)} onClick={() => void create()}><ShoppingBasket size={16} />{isCreating ? "Creating…" : existingListId !== null ? "Replace grocery list" : "Create grocery list"}</Button>
         </div>
       </DialogContent>
     </Dialog>

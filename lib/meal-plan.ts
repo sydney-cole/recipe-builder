@@ -1,4 +1,5 @@
 import type { FunctionReturnType } from "convex/server";
+import { ConvexError } from "convex/values";
 import type { api } from "@/convex/_generated/api";
 
 export type MealPlanEntry = FunctionReturnType<typeof api.mealPlans.listRange>[number];
@@ -70,6 +71,10 @@ export function recipeHrefFromMealPlan(entry: MealPlanEntry & { recipe: NonNulla
 export function mealPlanBackLink(mealPlanWeek: string | string[] | undefined) {
   const week = weekFromParam(mealPlanWeek);
   return week === null ? undefined : { href: `/app/meal-plan?week=${week}`, label: "Back to Meal Plan" };
+}
+
+export function mealPlanErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ConvexError && typeof error.data === "string" ? error.data : fallback;
 }
 
 export function parseGroceryItems(text: string) {

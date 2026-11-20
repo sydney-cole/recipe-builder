@@ -1,9 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AddMealDialog } from "./add-meal-dialog";
 import { GroceryReviewDialog } from "./grocery-review-dialog";
 import { WeekGrid } from "./week-grid";
+import type { Id } from "@/convex/_generated/dataModel";
 import { weekDays, type MealPlanEntry } from "@/lib/meal-plan";
 
 const mocks = vi.hoisted(() => ({
@@ -92,6 +94,10 @@ describe("WeekGrid", () => {
     mocks.mutation.mockRejectedValueOnce(new Error("offline"));
     await user.click(screen.getByRole("button", { name: "Remove Eating out" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't update this meal");
+
+    mocks.mutation.mockRejectedValueOnce(new ConvexError("Items to buy must be at most 100 characters each"));
+    await user.click(screen.getByRole("button", { name: "Remove Eating out" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Items to buy must be at most 100 characters each");
   });
 
   it("shows and edits the items to buy for a meal without a recipe", async () => {
@@ -168,6 +174,10 @@ describe("AddMealDialog", () => {
     await user.click(screen.getByRole("button", { name: "Eating out" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't add this meal");
     expect(onClose).not.toHaveBeenCalled();
+
+    mocks.mutation.mockRejectedValueOnce(new ConvexError("A meal can hold at most 10 entries"));
+    await user.click(screen.getByRole("button", { name: "Eating out" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("A meal can hold at most 10 entries");
   });
 
   it("explains loading, an empty Recipe Book, and stays closed without a target", () => {
@@ -218,6 +228,7 @@ describe("GroceryReviewDialog", () => {
       startDate: "2026-11-15",
       endDate: "2026-11-21",
       name: "Meal plan: Nov 15 – Nov 21",
+      replaceExisting: false,
     });
     expect(mocks.push).toHaveBeenCalledWith("/app/grocery-lists/list-1");
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -237,7 +248,21 @@ describe("GroceryReviewDialog", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't create the grocery list");
     expect(mocks.push).not.toHaveBeenCalled();
 
+    mocks.mutation.mockRejectedValueOnce(new ConvexError("The grocery list is full"));
+    await user.click(screen.getByRole("button", { name: "Create grocery list" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("The grocery list is full");
+
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("offers to replace the list already made for the week", async () => {
+    const user = userEvent.setup();
+    render(<GroceryReviewDialog open onOpenChange={vi.fn()} weekStart="2026-11-15" entries={entries} existingListId={"list-0" as Id<"groceryLists">} />);
+
+    expect(screen.getByRole("link", { name: "grocery list for this week" })).toHaveAttribute("href", "/app/grocery-lists/list-0");
+    await user.click(screen.getByRole("button", { name: "Replace grocery list" }));
+    expect(mocks.mutation).toHaveBeenCalledWith(expect.objectContaining({ startDate: "2026-11-15", replaceExisting: true }));
+    expect(mocks.push).toHaveBeenCalledWith("/app/grocery-lists/list-1");
   });
 });
